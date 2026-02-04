@@ -1,0 +1,189 @@
+[
+  {
+    "id": "t1",
+    "title": "Review TechFlow AI financials",
+    "type": "Due Diligence",
+    "dueDate": "2026-02-09",
+    "assignee": "gp1",
+    "companyId": "1",
+    "priority": "high",
+    "status": "pending",
+    "description": "Review Q4 2025 financial statements before board meeting"
+  },
+  {
+    "id": "t2",
+    "title": "Sign FinLedger board consent",
+    "type": "Approval",
+    "dueDate": "2026-02-06",
+    "assignee": "gp2",
+    "companyId": "4",
+    "priority": "high",
+    "status": "pending",
+    "description": "Approve new CFO appointment"
+  },
+  {
+    "id": "t3",
+    "title": "Prepare LP quarterly report",
+    "type": "Document Review",
+    "dueDate": "2026-02-11",
+    "assignee": "gp1",
+    "companyId": null,
+    "priority": "high",
+    "status": "in_progress",
+    "description": "Finalize Q4 2025 fund performance report for LP meeting"
+  },
+  {
+    "id": "t4",
+    "title": "Follow up with HealthBridge CEO",
+    "type": "Follow-up",
+    "dueDate": "2026-02-10",
+    "assignee": "gp1",
+    "companyId": "3",
+    "priority": "medium",
+    "status": "pending",
+    "description": "Discuss Series C timeline and investor introductions"
+  },
+  {
+    "id": "t5",
+    "title": "Review DataMesh IPO memo",
+    "type": "Document Review",
+    "dueDate": "2026-02-18",
+    "assignee": "gp1",
+    "companyId": "10",
+    "priority": "high",
+    "status": "pending",
+    "description": "Review and provide feedback on S-1 draft"
+  },
+  {
+    "id": "t6",
+    "title": "Complete GreenGrid due diligence",
+    "type": "Due Diligence",
+    "dueDate": "2026-02-15",
+    "assignee": "gp2",
+    "companyId": "2",
+    "priority": "medium",
+    "status": "in_progress",
+    "description": "Finish technical due diligence for follow-on investment"
+  },
+  {
+    "id": "t7",
+    "title": "Approve CyberShield budget",
+    "type": "Approval",
+    "dueDate": "2026-02-13",
+    "assignee": "gp2",
+    "companyId": "7",
+    "priority": "medium",
+    "status": "pending",
+    "description": "Review and approve 2026 operating budget"
+  },
+  {
+    "id": "t8",
+    "title": "Update EduSpark investment memo",
+    "type": "Document Review",
+    "dueDate": "2026-02-26",
+    "assignee": "gp3",
+    "companyId": "5",
+    "priority": "medium",
+    "status": "pending",
+    "description": "Update memo for Series A discussion"
+  },
+  {
+    "id": "t9",
+    "title": "Reference checks for BioGenix hire",
+    "type": "Due Diligence",
+    "dueDate": "2026-02-08",
+    "assignee": "gp3",
+    "companyId": "8",
+    "priority": "high",
+    "status": "pending",
+    "description": "Complete reference checks for VP Engineering candidate"
+  },
+  {
+    "id": "t10",
+    "title": "Review Nexus Robotics term sheet",
+    "type": "Document Review",
+    "dueDate": "2026-02-20",
+    "assignee": "gp3",
+    "companyId": "13",
+    "priority": "high",
+    "status": "pending",
+    "description": "Review Series B term sheet from lead investor"
+  },
+  {
+    "id": "t11",
+    "title": "Schedule InsurTech Pro check-in",
+    "type": "Follow-up",
+    "dueDate": "2026-02-12",
+    "assignee": "team1",
+    "companyId": "17",
+    "priority": "low",
+    "status": "pending",
+    "description": "Monthly founder check-in call"
+  },
+  {
+    "id": "t12",
+    "title": "Analyze PropTech market data",
+    "type": "Due Diligence",
+    "dueDate": "2026-02-14",
+    "assignee": "team1",
+    "companyId": "9",
+    "priority": "medium",
+    "status": "pending",
+    "description": "Prepare competitive landscape analysis"
+  },
+  {
+    "id": "t13",
+    "title": "Update CRM with new contacts",
+    "type": "Follow-up",
+    "dueDate": "2026-02-07",
+    "assignee": "team2",
+    "companyId": null,
+    "priority": "low",
+    "status": "pending",
+    "description": "Add contacts from recent conference"
+  },
+  {
+    "id": "t14",
+    "title": "Prepare IC presentation deck",
+    "type": "Document Review",
+    "dueDate": "2026-02-05",
+    "assignee": "team2",
+    "companyId": null,
+    "priority": "high",
+    "status": "in_progress",
+    "description": "Finalize deck for Thursday IC meeting"
+  },
+  {
+    "id": "t15",
+    "title": "Review LP quarterly statements",
+    "type": "Document Review",
+    "dueDate": "2026-02-10",
+    "assignee": "team4",
+    "companyId": null,
+    "priority": "high",
+    "status": "pending",
+    "description": "QC fund accounting statements before distribution"
+  },
+  {
+    "id": "t16",
+    "title": "Book travel for partner retreat",
+    "type": "Follow-up",
+    "dueDate": "2026-02-15",
+    "assignee": "team4",
+    "companyId": null,
+    "priority": "medium",
+    "status": "pending",
+    "description": "Finalize travel and accommodation for Napa retreat"
+  },
+  {
+    "id": "t17",
+    "title": "Pipeline research - AI startups",
+    "type": "Due Diligence",
+    "dueDate": "2026-02-12",
+    "assignee": "team3",
+    "companyId": null,
+    "priority": "medium",
+    "status": "in_progress",
+    "description": "Research emerging AI companies for potential investment"
+  }
+]

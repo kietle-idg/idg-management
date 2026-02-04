@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Setup | IDG Ventures</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-card" style="max-width: 500px;">
+      <div class="login-header">
+        <div class="login-logo">IDG</div>
+        <h1 class="login-title">Initial Setup</h1>
+        <p class="login-subtitle">Create your admin account and load sample data</p>
+      </div>
+
+      <div id="status-message" class="login-error"></div>
+
+      <div id="step-1">
+        <h3 style="margin-bottom: 16px;">Step 1: Create Admin Account</h3>
+        <form id="admin-form">
+          <div class="form-group">
+            <label class="form-label" for="admin-name">Full Name</label>
+            <input type="text" id="admin-name" class="form-input" placeholder="Katherine Le" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="admin-email">Email</label>
+            <input type="email" id="admin-email" class="form-input" placeholder="admin@idgventures.com" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="admin-password">Password</label>
+            <input type="password" id="admin-password" class="form-input" placeholder="Min 6 characters" required minlength="6">
+          </div>
+          <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">Create Admin Account</button>
+        </form>
+      </div>
+
+      <div id="step-2" class="hidden">
+        <h3 style="margin-bottom: 16px;">Step 2: Load Sample Data</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          This will populate your database with sample fund data, portfolio companies, team members, events, and tasks.
+        </p>
+        <button id="load-data-btn" class="btn btn-primary btn-lg" style="width: 100%;">Load Sample Data</button>
+      </div>
+
+      <div id="step-3" class="hidden">
+        <div style="text-align: center; padding: 24px 0;">
+          <div style="font-size: 48px; margin-bottom: 16px;">✓</div>
+          <h3 style="margin-bottom: 8px;">Setup Complete!</h3>
+          <p style="color: var(--text-secondary); margin-bottom: 24px;">Your IDG Ventures platform is ready to use.</p>
+          <a href="index.html" class="btn btn-primary btn-lg">Go to Dashboard</a>
+        </div>
+      </div>
+
+      <div id="loading" class="hidden" style="text-align: center; padding: 24px 0;">
+        <div class="spinner" style="margin: 0 auto 16px;"></div>
+        <p style="color: var(--text-secondary);" id="loading-text">Processing...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+  <script src="firebase-config.js"></script>
+
+  <script>
+    // Sample data
+    const sampleData = {
+      fund: {
+        fundName: "IDG Ventures Fund III",
+        aum: 250000000,
+        capitalDeployed: 175000000,
+        capitalRemaining: 75000000,
+        irr: 28.5,
+        moic: 2.4,
+        portfolioCount: 18,
+        vintage: 2022,
+        fundSize: 250000000
+      },
+      companies: [
+        { name: "TechFlow AI", sector: "Artificial Intelligence", stage: "Series B", investmentDate: "2022-03-15", investmentAmount: 15000000, currentValuation: 120000000, ownership: 12.5, founder: "Sarah Chen", founderEmail: "sarah@techflow.ai", status: "Active", description: "Enterprise AI automation platform", location: "San Francisco, CA" },
+        { name: "GreenGrid Energy", sector: "CleanTech", stage: "Series A", investmentDate: "2022-06-20", investmentAmount: 8000000, currentValuation: 45000000, ownership: 17.8, founder: "Marcus Johnson", founderEmail: "marcus@greengrid.com", status: "Active", description: "Smart grid optimization for renewable energy", location: "Austin, TX" },
+        { name: "HealthBridge", sector: "Healthcare", stage: "Series B", investmentDate: "2022-09-10", investmentAmount: 12000000, currentValuation: 80000000, ownership: 15.0, founder: "Dr. Emily Watson", founderEmail: "emily@healthbridge.io", status: "Active", description: "Telemedicine platform for rural communities", location: "Boston, MA" },
+        { name: "FinLedger", sector: "FinTech", stage: "Series A", investmentDate: "2023-01-25", investmentAmount: 6000000, currentValuation: 32000000, ownership: 18.75, founder: "Alex Rivera", founderEmail: "alex@finledger.co", status: "Active", description: "Blockchain-based accounting for SMBs", location: "New York, NY" },
+        { name: "EduSpark", sector: "EdTech", stage: "Seed", investmentDate: "2023-04-12", investmentAmount: 2500000, currentValuation: 12000000, ownership: 20.8, founder: "James Park", founderEmail: "james@eduspark.com", status: "Active", description: "AI-powered personalized learning for K-12", location: "Seattle, WA" },
+        { name: "LogiRoute", sector: "Logistics", stage: "Series B", investmentDate: "2022-11-08", investmentAmount: 18000000, currentValuation: 95000000, ownership: 18.9, founder: "Maria Santos", founderEmail: "maria@logiroute.io", status: "Active", description: "AI-driven last-mile delivery optimization", location: "Chicago, IL" },
+        { name: "CyberShield", sector: "Cybersecurity", stage: "Series A", investmentDate: "2023-02-28", investmentAmount: 10000000, currentValuation: 55000000, ownership: 18.2, founder: "David Kim", founderEmail: "david@cybershield.com", status: "Active", description: "Zero-trust security for cloud infrastructure", location: "Denver, CO" },
+        { name: "BioGenix", sector: "BioTech", stage: "Series A", investmentDate: "2023-05-15", investmentAmount: 9000000, currentValuation: 40000000, ownership: 22.5, founder: "Dr. Lisa Chang", founderEmail: "lisa@biogenix.bio", status: "Active", description: "CRISPR-based therapeutic development", location: "San Diego, CA" },
+        { name: "DataMesh", sector: "Data Infrastructure", stage: "Series B", investmentDate: "2022-08-05", investmentAmount: 20000000, currentValuation: 150000000, ownership: 13.3, founder: "Rachel Green", founderEmail: "rachel@datamesh.com", status: "Active", description: "Enterprise data lakehouse platform", location: "San Francisco, CA" },
+        { name: "SpaceLink", sector: "SpaceTech", stage: "Series B", investmentDate: "2022-12-01", investmentAmount: 25000000, currentValuation: 180000000, ownership: 13.9, founder: "Dr. Steven Hughes", founderEmail: "steven@spacelink.io", status: "Active", description: "Satellite communication infrastructure", location: "Houston, TX" },
+        { name: "CloudSecure", sector: "Cloud Computing", stage: "Exited", investmentDate: "2020-05-20", investmentAmount: 5000000, currentValuation: 200000000, ownership: 8.5, founder: "Jennifer Liu", founderEmail: "jennifer@cloudsecure.io", status: "Exited", description: "Cloud security compliance automation", location: "Seattle, WA" },
+        { name: "Nexus Robotics", sector: "Robotics", stage: "Series A", investmentDate: "2023-06-15", investmentAmount: 11000000, currentValuation: 60000000, ownership: 18.3, founder: "Robert Lee", founderEmail: "robert@nexusrobotics.com", status: "Active", description: "Warehouse automation robotics", location: "Pittsburgh, PA" }
+      ],
+      users: [
+        { name: "Daniel Thompson", email: "daniel@idgventures.com", role: "GP", title: "General Partner", assignedCompanies: [] },
+        { name: "Michelle Park", email: "michelle@idgventures.com", role: "GP", title: "General Partner", assignedCompanies: [] },
+        { name: "Richard Sterling", email: "richard@sterlingfamily.com", role: "LP", title: "Limited Partner", commitment: 25000000 },
+        { name: "Global Pension Fund", email: "investments@globalpension.com", role: "LP", title: "Institutional LP", commitment: 50000000 },
+        { name: "Jessica Chen", email: "jessica@idgventures.com", role: "Team", title: "Principal", assignedCompanies: [] },
+        { name: "Marcus Williams", email: "marcus.w@idgventures.com", role: "Team", title: "Associate", assignedCompanies: [] },
+        { name: "Sophie Anderson", email: "sophie@idgventures.com", role: "Team", title: "Analyst", assignedCompanies: [] }
+      ]
+    };
+
+    let adminUserId = null;
+
+    // Show message
+    function showMessage(text, isError = true) {
+      const el = document.getElementById('status-message');
+      el.textContent = text;
+      el.style.background = isError ? 'var(--danger-light)' : 'var(--success-light)';
+      el.style.color = isError ? 'var(--danger)' : 'var(--success)';
+      el.classList.add('visible');
+    }
+
+    // Show loading
+    function showLoading(text) {
+      document.getElementById('loading').classList.remove('hidden');
+      document.getElementById('loading-text').textContent = text;
+    }
+
+    function hideLoading() {
+      document.getElementById('loading').classList.add('hidden');
+    }
+
+    // Step 1: Create admin account
+    document.getElementById('admin-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const name = document.getElementById('admin-name').value;
+      const email = document.getElementById('admin-email').value;
+      const password = document.getElementById('admin-password').value;
+      
+      document.getElementById('step-1').classList.add('hidden');
+      showLoading('Creating admin account...');
+      
+      try {
+        // Create Firebase auth user
+        const result = await firebase.auth().createUserWithEmailAndPassword(email, password);
+        adminUserId = result.user.uid;
+        
+        // Create user document with Admin role
+        await firebase.firestore().collection('users').doc(adminUserId).set({
+          email: email,
+          name: name,
+          role: 'Admin',
+          title: 'Managing Partner',
+          assignedCompanies: [],
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        hideLoading();
+        document.getElementById('step-2').classList.remove('hidden');
+        showMessage('Admin account created successfully!', false);
+        
+      } catch (error) {
+        hideLoading();
+        document.getElementById('step-1').classList.remove('hidden');
+        showMessage(error.message);
+      }
+    });
+
+    // Step 2: Load sample data
+    document.getElementById('load-data-btn').addEventListener('click', async () => {
+      document.getElementById('step-2').classList.add('hidden');
+      showLoading('Loading fund data...');
+      
+      try {
+        const db = firebase.firestore();
+        const companyIds = [];
+        
+        // 1. Create fund document
+        await db.collection('fund').doc('main').set(sampleData.fund);
+        
+        showLoading('Creating portfolio companies...');
+        
+        // 2. Create companies
+        for (const company of sampleData.companies) {
+          const docRef = await db.collection('companies').add({
+            ...company,
+            assignedUsers: [adminUserId],
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          companyIds.push(docRef.id);
+        }
+        
+        // Update admin with assigned companies
+        await db.collection('users').doc(adminUserId).update({
+          assignedCompanies: companyIds.slice(0, 6)
+        });
+        
+        showLoading('Creating team members...');
+        
+        // 3. Create other users (without Firebase auth - they'll need to be invited)
+        for (const user of sampleData.users) {
+          await db.collection('users').add({
+            ...user,
+            assignedCompanies: user.role === 'Team' ? companyIds.slice(0, 3) : [],
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }
+        
+        showLoading('Creating sample events...');
+        
+        // 4. Create sample events
+        const today = new Date();
+        const events = [
+          { title: "TechFlow AI Board Meeting", type: "Board Meeting", date: formatDate(addDays(today, 5)), time: "10:00 AM", location: "Zoom", priority: "high", attendees: [adminUserId] },
+          { title: "LP Quarterly Update", type: "LP Meeting", date: formatDate(addDays(today, 10)), time: "2:00 PM", location: "Conference Room A", priority: "high", attendees: [adminUserId] },
+          { title: "DataMesh Board Meeting", type: "Board Meeting", date: formatDate(addDays(today, 15)), time: "1:00 PM", location: "San Francisco", priority: "high", attendees: [adminUserId] },
+          { title: "Investment Committee", type: "Internal", date: formatDate(addDays(today, 2)), time: "10:00 AM", location: "Conference Room B", priority: "high", attendees: [adminUserId] }
+        ];
+        
+        for (const event of events) {
+          await db.collection('events').add({
+            ...event,
+            companyId: null,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }
+        
+        showLoading('Creating sample tasks...');
+        
+        // 5. Create sample tasks
+        const tasks = [
+          { title: "Review TechFlow AI financials", type: "Due Diligence", dueDate: formatDate(addDays(today, 3)), priority: "high", status: "pending", assignee: adminUserId },
+          { title: "Prepare LP quarterly report", type: "Document Review", dueDate: formatDate(addDays(today, 7)), priority: "high", status: "in_progress", assignee: adminUserId },
+          { title: "Review DataMesh IPO memo", type: "Document Review", dueDate: formatDate(addDays(today, 12)), priority: "high", status: "pending", assignee: adminUserId },
+          { title: "Follow up with HealthBridge CEO", type: "Follow-up", dueDate: formatDate(addDays(today, 5)), priority: "medium", status: "pending", assignee: adminUserId }
+        ];
+        
+        for (const task of tasks) {
+          await db.collection('tasks').add({
+            ...task,
+            companyId: null,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }
+        
+        hideLoading();
+        document.getElementById('status-message').classList.remove('visible');
+        document.getElementById('step-3').classList.remove('hidden');
+        
+      } catch (error) {
+        hideLoading();
+        document.getElementById('step-2').classList.remove('hidden');
+        showMessage('Error loading data: ' + error.message);
+      }
+    });
+
+    // Helper functions
+    function addDays(date, days) {
+      const result = new Date(date);
+      result.setDate(result.getDate() + days);
+      return result;
+    }
+
+    function formatDate(date) {
+      return date.toISOString().split('T')[0];
+    }
+  </script>
+</body>
+</html>

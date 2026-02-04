@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In | IDG Ventures</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-logo">IDG</div>
+        <h1 class="login-title">Welcome back</h1>
+        <p class="login-subtitle">Sign in to IDG Ventures Fund Management</p>
+      </div>
+
+      <div id="login-error" class="login-error"></div>
+
+      <form id="login-form" class="login-form">
+        <div class="form-group">
+          <label class="form-label" for="email">Email</label>
+          <input 
+            type="email" 
+            id="email" 
+            class="form-input" 
+            placeholder="you@example.com"
+            required
+            autocomplete="email"
+          >
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <input 
+            type="password" 
+            id="password" 
+            class="form-input" 
+            placeholder="Enter your password"
+            required
+            autocomplete="current-password"
+          >
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-lg" id="login-btn">
+          Sign in
+        </button>
+      </form>
+
+      <div class="login-footer">
+        <a href="#" class="login-link" id="forgot-password">Forgot your password?</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="auth.js"></script>
+
+  <script>
+    // Check if already logged in
+    firebaseAuth.onAuthStateChanged((user) => {
+      if (user) {
+        window.location.href = 'index.html';
+      }
+    });
+
+    // Login form handler
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const errorEl = document.getElementById('login-error');
+      const btnEl = document.getElementById('login-btn');
+      
+      // Clear previous error
+      errorEl.textContent = '';
+      errorEl.classList.remove('visible');
+      
+      // Disable button
+      btnEl.disabled = true;
+      btnEl.textContent = 'Signing in...';
+      
+      try {
+        const result = await Auth.signIn(email, password);
+        
+        if (result.success) {
+          window.location.href = 'index.html';
+        } else {
+          errorEl.textContent = result.error;
+          errorEl.classList.add('visible');
+          btnEl.disabled = false;
+          btnEl.textContent = 'Sign in';
+        }
+      } catch (error) {
+        errorEl.textContent = 'An unexpected error occurred. Please try again.';
+        errorEl.classList.add('visible');
+        btnEl.disabled = false;
+        btnEl.textContent = 'Sign in';
+      }
+    });
+
+    // Forgot password handler
+    document.getElementById('forgot-password').addEventListener('click', async (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('email').value;
+      const errorEl = document.getElementById('login-error');
+      
+      if (!email) {
+        errorEl.textContent = 'Please enter your email address first.';
+        errorEl.classList.add('visible');
+        return;
+      }
+      
+      const result = await Auth.resetPassword(email);
+      
+      if (result.success) {
+        errorEl.textContent = 'Password reset email sent. Check your inbox.';
+        errorEl.style.background = 'var(--success-light)';
+        errorEl.style.color = 'var(--success)';
+        errorEl.classList.add('visible');
+      } else {
+        errorEl.textContent = result.error;
+        errorEl.classList.add('visible');
+      }
+    });
+  </script>
+</body>
+</html>

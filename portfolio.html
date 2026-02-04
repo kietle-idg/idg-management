@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portfolio | IDGX Capital</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Navigation -->
+    <nav class="navbar">
+      <div class="navbar-inner">
+        <a href="index.html" class="navbar-brand">
+          <div class="navbar-logo">IDGX</div>
+          <span>IDGX Capital</span>
+        </a>
+        
+        <div class="navbar-nav">
+          <a href="index.html" class="nav-link">Dashboard</a>
+          <a href="portfolio.html" class="nav-link active" id="nav-portfolio">Portfolio</a>
+          <a href="personal.html" class="nav-link">My View</a>
+        </div>
+
+        <div class="navbar-user">
+          <div class="user-menu">
+            <button class="user-button">
+              <div class="user-avatar" id="user-avatar">--</div>
+              <span id="user-name">Loading...</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 9l6 6 6-6"/>
+              </svg>
+            </button>
+            <div class="user-dropdown">
+              <div class="dropdown-item" style="pointer-events: none; padding-bottom: 8px;">
+                <small style="color: var(--text-muted);">Signed in as <span id="user-role-text">-</span></small>
+              </div>
+              <div class="dropdown-divider"></div>
+              <div id="user-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main">
+      <div class="container container-lg">
+        <!-- Page Header -->
+        <div class="page-header">
+          <h1 class="page-title">Portfolio Companies</h1>
+          <p class="page-subtitle">All investments in IDGX Capital Fund III</p>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading-state" class="loading">
+          <div class="spinner"></div>
+        </div>
+
+        <!-- Portfolio Content -->
+        <div id="portfolio-content" class="hidden">
+          <!-- Summary Stats -->
+          <div class="metrics mb-8">
+            <div class="metric">
+              <div class="metric-value" id="total-companies">0</div>
+              <div class="metric-label">Total Companies</div>
+            </div>
+            <div class="metric">
+              <div class="metric-value" id="active-companies">0</div>
+              <div class="metric-label">Active</div>
+            </div>
+            <div class="metric">
+              <div class="metric-value" id="total-invested">$0</div>
+              <div class="metric-label">Total Invested</div>
+            </div>
+            <div class="metric">
+              <div class="metric-value" id="total-value">$0</div>
+              <div class="metric-label">Current Value</div>
+            </div>
+          </div>
+
+          <!-- Filters -->
+          <div class="card mb-6">
+            <div class="card-body" style="padding: 16px 24px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                <div class="filters">
+                  <button class="filter-btn active" data-filter="all">All</button>
+                  <button class="filter-btn" data-filter="active">Active</button>
+                  <button class="filter-btn" data-filter="exited">Exited</button>
+                </div>
+                <div class="search-box" style="min-width: 280px;">
+                  <span class="search-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="11" cy="11" r="8"></circle>
+                      <path d="M21 21l-4.35-4.35"></path>
+                    </svg>
+                  </span>
+                  <input type="text" class="search-input" id="search-input" placeholder="Search companies, sectors...">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Portfolio Table -->
+          <div class="card">
+            <div class="card-body no-padding">
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Company</th>
+                      <th>Stage</th>
+                      <th class="text-right">Invested</th>
+                      <th class="text-right">Valuation</th>
+                      <th class="text-right">Ownership</th>
+                      <th>Founder</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="portfolio-table"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Export Buttons -->
+          <div class="mt-6" style="display: flex; gap: 12px; justify-content: flex-end;">
+            <button class="btn btn-secondary" onclick="exportToPDF()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+              </svg>
+              Export PDF
+            </button>
+            <button class="btn btn-secondary" onclick="exportToExcel()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+              </svg>
+              Export Excel
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  
+  <script>
+    let currentFilter = 'all';
+    let currentSearch = '';
+
+    async function init() {
+      await loadAllData();
+      renderNavbar();
+      
+      const user = getCurrentUser();
+      
+      // LP cannot view portfolio
+      if (user?.role === 'LP') {
+        window.location.href = 'index.html';
+        return;
+      }
+
+      renderSummary();
+      renderTable();
+      setupFilters();
+      
+      document.getElementById('loading-state').classList.add('hidden');
+      document.getElementById('portfolio-content').classList.remove('hidden');
+    }
+
+    function renderSummary() {
+      const user = getCurrentUser();
+      let companies = companiesData;
+      
+      // Team sees only assigned companies
+      if (user?.role === 'Team' && user.portfolioCompanies) {
+        companies = companiesData.filter(c => user.portfolioCompanies.includes(c.id));
+      }
+
+      const active = companies.filter(c => c.status === 'Active');
+      const totalInvested = companies.reduce((sum, c) => sum + (c.investmentAmount || 0), 0);
+      const totalValue = companies.reduce((sum, c) => sum + ((c.currentValuation || 0) * (c.ownership || 0) / 100), 0);
+
+      document.getElementById('total-companies').textContent = companies.length;
+      document.getElementById('active-companies').textContent = active.length;
+      document.getElementById('total-invested').textContent = formatCurrency(totalInvested);
+      document.getElementById('total-value').textContent = formatCurrency(totalValue);
+    }
+
+    function renderTable() {
+      const user = getCurrentUser();
+      let companies = [...companiesData];
+      
+      // Team sees only assigned companies
+      if (user?.role === 'Team' && user.portfolioCompanies) {
+        companies = companies.filter(c => user.portfolioCompanies.includes(c.id));
+      }
+
+      // Apply filter
+      if (currentFilter === 'active') {
+        companies = companies.filter(c => c.status === 'Active');
+      } else if (currentFilter === 'exited') {
+        companies = companies.filter(c => c.status === 'Exited');
+      }
+
+      // Apply search
+      if (currentSearch) {
+        const s = currentSearch.toLowerCase();
+        companies = companies.filter(c => 
+          c.name?.toLowerCase().includes(s) ||
+          c.sector?.toLowerCase().includes(s) ||
+          c.founder?.toLowerCase().includes(s)
+        );
+      }
+
+      // Sort by valuation
+      companies.sort((a, b) => (b.currentValuation || 0) - (a.currentValuation || 0));
+
+      const html = companies.map(c => `
+        <tr>
+          <td>
+            <div class="company-cell">
+              <div class="company-icon">${c.logo || c.name?.charAt(0)}</div>
+              <div>
+                <div class="company-name">${c.name}</div>
+                <div class="company-sector">${c.sector}</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="badge ${getStageBadgeClass(c.stage)}">${c.stage}</span></td>
+          <td class="text-right value">${formatCurrency(c.investmentAmount)}</td>
+          <td class="text-right value">${formatCurrency(c.currentValuation)}</td>
+          <td class="text-right">${(c.ownership || 0).toFixed(1)}%</td>
+          <td>${c.founder || '-'}</td>
+          <td><span class="badge ${c.status === 'Active' ? 'badge-success' : 'badge-default'}">${c.status}</span></td>
+        </tr>
+      `).join('');
+
+      document.getElementById('portfolio-table').innerHTML = html || '<tr><td colspan="7" class="text-center text-muted" style="padding: 48px;">No companies found</td></tr>';
+    }
+
+    function setupFilters() {
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentFilter = btn.dataset.filter;
+          renderTable();
+        });
+      });
+
+      document.getElementById('search-input').addEventListener('input', (e) => {
+        currentSearch = e.target.value;
+        renderTable();
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

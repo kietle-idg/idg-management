@@ -1,0 +1,102 @@
+[
+  {
+    "id": "gp1",
+    "name": "Katherine Le",
+    "email": "katherine@idgventures.com",
+    "role": "GP",
+    "title": "Managing Partner",
+    "avatar": "👩‍💼",
+    "portfolioCompanies": ["1", "3", "6", "10", "14", "18"],
+    "joinDate": "2018-01-15"
+  },
+  {
+    "id": "gp2",
+    "name": "Daniel Thompson",
+    "email": "daniel@idgventures.com",
+    "role": "GP",
+    "title": "General Partner",
+    "avatar": "👨‍💼",
+    "portfolioCompanies": ["2", "4", "7", "11", "16"],
+    "joinDate": "2019-06-01"
+  },
+  {
+    "id": "gp3",
+    "name": "Michelle Park",
+    "email": "michelle@idgventures.com",
+    "role": "GP",
+    "title": "General Partner",
+    "avatar": "👩‍💼",
+    "portfolioCompanies": ["5", "8", "9", "12", "13", "15", "17"],
+    "joinDate": "2020-03-10"
+  },
+  {
+    "id": "lp1",
+    "name": "Richard Sterling",
+    "email": "richard@sterlingfamily.com",
+    "role": "LP",
+    "title": "Limited Partner",
+    "avatar": "🧑‍💼",
+    "commitment": 25000000,
+    "joinDate": "2022-01-01"
+  },
+  {
+    "id": "lp2",
+    "name": "Global Pension Fund",
+    "email": "investments@globalpension.com",
+    "role": "LP",
+    "title": "Institutional LP",
+    "avatar": "🏛️",
+    "commitment": 50000000,
+    "joinDate": "2022-01-01"
+  },
+  {
+    "id": "lp3",
+    "name": "Tech Founders Alliance",
+    "email": "admin@techfounders.org",
+    "role": "LP",
+    "title": "Limited Partner",
+    "avatar": "💼",
+    "commitment": 15000000,
+    "joinDate": "2022-02-15"
+  },
+  {
+    "id": "team1",
+    "name": "Jessica Chen",
+    "email": "jessica@idgventures.com",
+    "role": "Team",
+    "title": "Principal",
+    "avatar": "👩",
+    "portfolioCompanies": ["5", "9", "12", "15"],
+    "joinDate": "2021-08-01"
+  },
+  {
+    "id": "team2",
+    "name": "Marcus Williams",
+    "email": "marcus@idgventures.com",
+    "role": "Team",
+    "title": "Associate",
+    "avatar": "👨",
+    "portfolioCompanies": ["4", "8", "17"],
+    "joinDate": "2023-01-15"
+  },
+  {
+    "id": "team3",
+    "name": "Sophie Anderson",
+    "email": "sophie@idgventures.com",
+    "role": "Team",
+    "title": "Analyst",
+    "avatar": "👩",
+    "portfolioCompanies": [],
+    "joinDate": "2024-06-01"
+  },
+  {
+    "id": "team4",
+    "name": "Brian Foster",
+    "email": "brian@idgventures.com",
+    "role": "Team",
+    "title": "Operations Manager",
+    "avatar": "👨",
+    "portfolioCompanies": [],
+    "joinDate": "2020-11-01"
+  }
+]

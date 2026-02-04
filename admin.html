@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin | IDG Ventures</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Navigation -->
+    <nav class="navbar">
+      <div class="navbar-inner">
+        <a href="index.html" class="navbar-brand">
+          <div class="navbar-logo">IDG</div>
+          <span>IDG Ventures</span>
+        </a>
+        
+        <div class="navbar-nav">
+          <a href="index.html" class="nav-link">Dashboard</a>
+          <a href="portfolio.html" class="nav-link">Portfolio</a>
+          <a href="personal.html" class="nav-link">My View</a>
+          <a href="documents.html" class="nav-link">Documents</a>
+          <a href="admin.html" class="nav-link active">Admin</a>
+        </div>
+
+        <div class="navbar-user">
+          <div class="user-menu">
+            <button class="user-button">
+              <div class="user-avatar" id="user-avatar">--</div>
+              <span id="user-name">Loading...</span>
+            </button>
+            <div class="user-dropdown">
+              <div class="dropdown-item" style="pointer-events: none;">
+                <small style="color: var(--text-muted);" id="user-role-text">Role</small>
+              </div>
+              <div class="dropdown-divider"></div>
+              <button class="dropdown-item" onclick="Auth.signOut()">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main">
+      <div class="container container-lg">
+        <!-- Page Header -->
+        <div class="page-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h1 class="page-title">Admin Panel</h1>
+            <p class="page-subtitle">Manage users, roles, and system settings</p>
+          </div>
+          <button class="btn btn-primary" onclick="showAddUserModal()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Add User
+          </button>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading-state" class="loading">
+          <div class="spinner"></div>
+        </div>
+
+        <!-- Admin Content -->
+        <div id="admin-content" class="hidden">
+          <!-- User Stats -->
+          <div class="metrics mb-8">
+            <div class="metric">
+              <div class="metric-value" id="total-users">0</div>
+              <div class="metric-label">Total Users</div>
+            </div>
+            <div class="metric">
+              <div class="metric-value" id="gp-count">0</div>
+              <div class="metric-label">General Partners</div>
+            </div>
+            <div class="metric">
+              <div class="metric-value" id="lp-count">0</div>
+              <div class="metric-label">Limited Partners</div>
+            </div>
+            <div class="metric">
+              <div class="metric-value" id="team-count">0</div>
+              <div class="metric-label">Team Members</div>
+            </div>
+          </div>
+
+          <!-- Users Table -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">All Users</h3>
+              <div class="filters">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="Admin">Admin</button>
+                <button class="filter-btn" data-filter="GP">GP</button>
+                <button class="filter-btn" data-filter="LP">LP</button>
+                <button class="filter-btn" data-filter="Team">Team</button>
+              </div>
+            </div>
+            <div class="card-body no-padding">
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Title</th>
+                      <th>Joined</th>
+                      <th class="text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="users-table"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fund Settings -->
+          <div class="card mt-8">
+            <div class="card-header">
+              <h3 class="card-title">Fund Settings</h3>
+            </div>
+            <div class="card-body">
+              <form id="fund-form">
+                <div class="grid-2">
+                  <div class="form-group">
+                    <label class="form-label">Fund Name</label>
+                    <input type="text" class="form-input" id="fund-name" placeholder="IDG Ventures Fund III">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Vintage Year</label>
+                    <input type="number" class="form-input" id="fund-vintage" placeholder="2022">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Fund Size ($)</label>
+                    <input type="number" class="form-input" id="fund-size" placeholder="250000000">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">AUM ($)</label>
+                    <input type="number" class="form-input" id="fund-aum" placeholder="250000000">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">IRR (%)</label>
+                    <input type="number" step="0.1" class="form-input" id="fund-irr" placeholder="28.5">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">MOIC (x)</label>
+                    <input type="number" step="0.01" class="form-input" id="fund-moic" placeholder="2.4">
+                  </div>
+                </div>
+                <button type="submit" class="btn btn-primary mt-4">Save Fund Settings</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Add User Modal -->
+    <div class="modal-overlay" id="add-user-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3 class="modal-title">Add New User</h3>
+          <button class="modal-close" onclick="hideAddUserModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="add-user-form">
+            <div class="form-group">
+              <label class="form-label">Full Name</label>
+              <input type="text" class="form-input" id="new-user-name" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-input" id="new-user-email" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Password</label>
+              <input type="password" class="form-input" id="new-user-password" required minlength="6">
+              <div class="form-hint">Minimum 6 characters</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Role</label>
+              <select class="form-input form-select" id="new-user-role" required>
+                <option value="Team">Team Member</option>
+                <option value="GP">General Partner</option>
+                <option value="LP">Limited Partner</option>
+                <option value="Admin">Admin</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Title</label>
+              <input type="text" class="form-input" id="new-user-title" placeholder="e.g. Associate, Partner">
+            </div>
+            <div class="form-group" id="commitment-group" style="display: none;">
+              <label class="form-label">Commitment ($)</label>
+              <input type="number" class="form-input" id="new-user-commitment" placeholder="25000000">
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="hideAddUserModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="addUser()">Create User</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="auth.js"></script>
+  <script src="database.js"></script>
+
+  <script>
+    let allUsers = [];
+    let currentFilter = 'all';
+
+    // Initialize
+    async function initAdmin() {
+      await Auth.init();
+      
+      if (!Auth.isAuthenticated()) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      // Only Admin can access
+      if (Auth.currentUserData?.role !== 'Admin') {
+        window.location.href = 'index.html';
+        return;
+      }
+
+      const user = Auth.currentUserData;
+      document.getElementById('user-name').textContent = user?.name || 'User';
+      document.getElementById('user-avatar').textContent = user?.name?.split(' ').map(n => n[0]).join('') || '?';
+      document.getElementById('user-role-text').textContent = user?.role || '';
+
+      // Load data
+      await loadAdminData();
+    }
+
+    async function loadAdminData() {
+      // Load users
+      allUsers = await Database.getUsers();
+      
+      // Update stats
+      document.getElementById('total-users').textContent = allUsers.length;
+      document.getElementById('gp-count').textContent = allUsers.filter(u => u.role === 'GP').length;
+      document.getElementById('lp-count').textContent = allUsers.filter(u => u.role === 'LP').length;
+      document.getElementById('team-count').textContent = allUsers.filter(u => u.role === 'Team').length;
+
+      // Render users table
+      renderUsersTable();
+
+      // Load fund settings
+      const fund = await Database.getFund();
+      if (fund) {
+        document.getElementById('fund-name').value = fund.fundName || '';
+        document.getElementById('fund-vintage').value = fund.vintage || '';
+        document.getElementById('fund-size').value = fund.fundSize || '';
+        document.getElementById('fund-aum').value = fund.aum || '';
+        document.getElementById('fund-irr').value = fund.irr || '';
+        document.getElementById('fund-moic').value = fund.moic || '';
+      }
+
+      // Setup filters
+      setupFilters();
+
+      // Setup forms
+      setupForms();
+
+      // Hide loading
+      document.getElementById('loading-state').classList.add('hidden');
+      document.getElementById('admin-content').classList.remove('hidden');
+    }
+
+    function renderUsersTable() {
+      let users = [...allUsers];
+      
+      if (currentFilter !== 'all') {
+        users = users.filter(u => u.role === currentFilter);
+      }
+
+      const html = users.map(user => {
+        const joined = user.createdAt?.toDate?.() 
+          ? user.createdAt.toDate().toLocaleDateString() 
+          : 'N/A';
+        
+        return `
+          <tr>
+            <td>
+              <div class="company-cell">
+                <div class="user-avatar" style="width: 36px; height: 36px; font-size: 14px;">
+                  ${user.name?.split(' ').map(n => n[0]).join('') || '?'}
+                </div>
+                <div>
+                  <div class="company-name">${user.name || 'Unknown'}</div>
+                </div>
+              </div>
+            </td>
+            <td>${user.email || '-'}</td>
+            <td><span class="badge badge-${user.role?.toLowerCase() || 'default'}">${user.role || '-'}</span></td>
+            <td>${user.title || '-'}</td>
+            <td>${joined}</td>
+            <td class="text-right">
+              <button class="btn btn-ghost btn-sm" onclick="editUser('${user.id}')">Edit</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      document.getElementById('users-table').innerHTML = html || '<tr><td colspan="6" class="text-center text-muted" style="padding: 48px;">No users found</td></tr>';
+    }
+
+    function setupFilters() {
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentFilter = btn.dataset.filter;
+          renderUsersTable();
+        });
+      });
+    }
+
+    function setupForms() {
+      // Role change - show/hide commitment field
+      document.getElementById('new-user-role').addEventListener('change', (e) => {
+        const commitmentGroup = document.getElementById('commitment-group');
+        commitmentGroup.style.display = e.target.value === 'LP' ? 'block' : 'none';
+      });
+
+      // Fund settings form
+      document.getElementById('fund-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const fundData = {
+          fundName: document.getElementById('fund-name').value,
+          vintage: parseInt(document.getElementById('fund-vintage').value) || null,
+          fundSize: parseInt(document.getElementById('fund-size').value) || 0,
+          aum: parseInt(document.getElementById('fund-aum').value) || 0,
+          irr: parseFloat(document.getElementById('fund-irr').value) || 0,
+          moic: parseFloat(document.getElementById('fund-moic').value) || 0
+        };
+
+        const result = await Database.updateFund(fundData);
+        if (result.success) {
+          alert('Fund settings saved successfully!');
+        } else {
+          alert('Error saving fund settings');
+        }
+      });
+    }
+
+    // Modal functions
+    function showAddUserModal() {
+      document.getElementById('add-user-modal').classList.add('visible');
+    }
+
+    function hideAddUserModal() {
+      document.getElementById('add-user-modal').classList.remove('visible');
+      document.getElementById('add-user-form').reset();
+    }
+
+    async function addUser() {
+      const name = document.getElementById('new-user-name').value;
+      const email = document.getElementById('new-user-email').value;
+      const password = document.getElementById('new-user-password').value;
+      const role = document.getElementById('new-user-role').value;
+      const title = document.getElementById('new-user-title').value;
+      const commitment = document.getElementById('new-user-commitment').value;
+
+      if (!name || !email || !password) {
+        alert('Please fill in all required fields');
+        return;
+      }
+
+      const userData = {
+        name,
+        role,
+        title,
+        assignedCompanies: [],
+        commitment: role === 'LP' ? parseInt(commitment) || 0 : null
+      };
+
+      const result = await Auth.createUser(email, password, userData);
+      
+      if (result.success) {
+        hideAddUserModal();
+        await loadAdminData();
+        alert('User created successfully!');
+      } else {
+        alert('Error creating user: ' + result.error);
+      }
+    }
+
+    function editUser(userId) {
+      // Could open edit modal
+      console.log('Edit user:', userId);
+      alert('Edit functionality coming soon');
+    }
+
+    // Initialize
+    initAdmin();
+  </script>
+</body>
+</html>

@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard | IDGX Capital</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Navigation -->
+    <nav class="navbar">
+      <div class="navbar-inner">
+        <a href="index.html" class="navbar-brand">
+          <div class="navbar-logo">IDGX</div>
+          <span>IDGX Capital</span>
+        </a>
+        
+        <div class="navbar-nav">
+          <a href="index.html" class="nav-link active">Dashboard</a>
+          <a href="portfolio.html" class="nav-link" id="nav-portfolio">Portfolio</a>
+          <a href="personal.html" class="nav-link">My View</a>
+        </div>
+
+        <div class="navbar-user">
+          <div class="user-menu">
+            <button class="user-button">
+              <div class="user-avatar" id="user-avatar">--</div>
+              <span id="user-name">Loading...</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 9l6 6 6-6"/>
+              </svg>
+            </button>
+            <div class="user-dropdown">
+              <div class="dropdown-item" style="pointer-events: none; padding-bottom: 8px;">
+                <small style="color: var(--text-muted);">Signed in as <span id="user-role-text">-</span></small>
+              </div>
+              <div class="dropdown-divider"></div>
+              <div id="user-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main">
+      <div class="container container-lg">
+        <!-- Page Header -->
+        <div class="page-header">
+          <h1 class="page-title">Fund Dashboard</h1>
+          <p class="page-subtitle" id="page-subtitle">Overview of IDGX Capital Fund III</p>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading-state" class="loading">
+          <div class="spinner"></div>
+        </div>
+
+        <!-- Dashboard Content -->
+        <div id="dashboard-content" class="hidden">
+          <!-- Metrics - Full view for GP -->
+          <div id="metrics-full" class="metrics">
+            <div class="metric">
+              <div class="metric-value" id="metric-aum">$0</div>
+              <div class="metric-label">Total AUM</div>
+            </div>
+            <div class="metric">
+              <div class="metric-value positive" id="metric-irr">0%</div>
+              <div class="metric-label">Net IRR</div>
+            </div>
+            <div class="metric">
+              <div class="metric-value positive" id="metric-moic">0x</div>
+              <div class="metric-label">MOIC</div>
+            </div>
+            <div class="metric">
+              <div class="metric-value" id="metric-companies">0</div>
+              <div class="metric-label">Portfolio Companies</div>
+            </div>
+          </div>
+
+          <!-- Metrics - LP view -->
+          <div id="metrics-lp" class="hidden">
+            <div class="commitment-card">
+              <div class="commitment-label">Your Commitment</div>
+              <div class="commitment-value" id="lp-commitment">$0</div>
+            </div>
+            <div class="metrics" style="margin-bottom: 0;">
+              <div class="metric">
+                <div class="metric-value positive" id="lp-irr">0%</div>
+                <div class="metric-label">Net IRR</div>
+              </div>
+              <div class="metric">
+                <div class="metric-value positive" id="lp-moic">0x</div>
+                <div class="metric-label">MOIC</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Capital Deployment -->
+          <div id="capital-section" class="card mb-8">
+            <div class="card-header">
+              <h3 class="card-title">Capital Deployment</h3>
+            </div>
+            <div class="card-body">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                <div>
+                  <span style="color: var(--text-muted);">Deployed</span>
+                  <span class="font-semibold" id="capital-deployed" style="margin-left: 8px;">$0</span>
+                </div>
+                <div>
+                  <span style="color: var(--text-muted);">Remaining</span>
+                  <span class="font-semibold" id="capital-remaining" style="margin-left: 8px;">$0</span>
+                </div>
+              </div>
+              <div class="progress">
+                <div class="progress-bar" id="capital-progress" style="width: 0%"></div>
+              </div>
+              <div style="text-align: center; margin-top: 8px; color: var(--text-muted); font-size: 13px;" id="capital-percent">0% deployed</div>
+            </div>
+          </div>
+
+          <!-- Two Column Layout -->
+          <div class="grid-2">
+            <!-- Top Companies -->
+            <div id="companies-section" class="card">
+              <div class="card-header">
+                <h3 class="card-title">Top Companies</h3>
+                <a href="portfolio.html" class="btn btn-ghost btn-sm">View all</a>
+              </div>
+              <div class="card-body no-padding">
+                <div class="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Company</th>
+                        <th class="text-right">Valuation</th>
+                        <th>Stage</th>
+                      </tr>
+                    </thead>
+                    <tbody id="top-companies"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Upcoming Events -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">Upcoming Events</h3>
+                <a href="personal.html" class="btn btn-ghost btn-sm">View all</a>
+              </div>
+              <div class="card-body">
+                <ul class="list" id="upcoming-events"></ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    async function init() {
+      await loadAllData();
+      renderNavbar();
+      
+      const user = getCurrentUser();
+      const role = user?.role;
+
+      // Role-based view
+      if (role === 'LP') {
+        document.getElementById('metrics-full').classList.add('hidden');
+        document.getElementById('metrics-lp').classList.remove('hidden');
+        document.getElementById('capital-section').classList.add('hidden');
+        document.getElementById('companies-section').classList.add('hidden');
+        document.getElementById('page-subtitle').textContent = 'Your investment overview';
+        
+        document.getElementById('lp-irr').textContent = formatPercent(fundData?.irr);
+        document.getElementById('lp-moic').textContent = (fundData?.moic || 0).toFixed(2) + 'x';
+        document.getElementById('lp-commitment').textContent = formatCurrency(user?.commitment || 0);
+        
+      } else if (role === 'Team') {
+        document.getElementById('capital-section').classList.add('hidden');
+        document.getElementById('companies-section').classList.add('hidden');
+        document.getElementById('page-subtitle').textContent = 'Your team overview';
+        
+        renderMetrics();
+      } else {
+        // GP/Admin - full view
+        renderMetrics();
+        renderCapital();
+        renderTopCompanies();
+      }
+
+      renderEvents();
+      
+      document.getElementById('loading-state').classList.add('hidden');
+      document.getElementById('dashboard-content').classList.remove('hidden');
+    }
+
+    function renderMetrics() {
+      document.getElementById('metric-aum').textContent = formatCurrency(fundData?.aum);
+      document.getElementById('metric-irr').textContent = formatPercent(fundData?.irr);
+      document.getElementById('metric-moic').textContent = (fundData?.moic || 0).toFixed(2) + 'x';
+      document.getElementById('metric-companies').textContent = fundData?.portfolioCount || companiesData.length;
+    }
+
+    function renderCapital() {
+      const deployed = fundData?.capitalDeployed || 0;
+      const total = fundData?.fundSize || 1;
+      const percent = ((deployed / total) * 100).toFixed(0);
+      
+      document.getElementById('capital-deployed').textContent = formatCurrency(deployed);
+      document.getElementById('capital-remaining').textContent = formatCurrency(fundData?.capitalRemaining);
+      document.getElementById('capital-progress').style.width = percent + '%';
+      document.getElementById('capital-percent').textContent = percent + '% deployed';
+    }
+
+    function renderTopCompanies() {
+      const top = companiesData
+        .filter(c => c.status === 'Active')
+        .sort((a, b) => (b.currentValuation || 0) - (a.currentValuation || 0))
+        .slice(0, 5);
+
+      const html = top.map(c => `
+        <tr>
+          <td>
+            <div class="company-cell">
+              <div class="company-icon">${c.logo || c.name?.charAt(0)}</div>
+              <div>
+                <div class="company-name">${c.name}</div>
+                <div class="company-sector">${c.sector}</div>
+              </div>
+            </div>
+          </td>
+          <td class="text-right value">${formatCurrency(c.currentValuation)}</td>
+          <td><span class="badge ${getStageBadgeClass(c.stage)}">${c.stage}</span></td>
+        </tr>
+      `).join('');
+
+      document.getElementById('top-companies').innerHTML = html || '<tr><td colspan="3" class="text-center text-muted">No companies</td></tr>';
+    }
+
+    function renderEvents() {
+      const user = getCurrentUser();
+      let events = eventsData
+        .filter(e => getDaysUntil(e.date) >= 0)
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+      // Filter by attendee for non-GP roles
+      if (user?.role === 'LP' || user?.role === 'Team') {
+        events = events.filter(e => e.attendees?.includes(user.id));
+      }
+
+      events = events.slice(0, 5);
+
+      const html = events.map(e => {
+        const d = formatDateShort(e.date);
+        return `
+          <li class="list-item">
+            <div class="event-date">
+              <div class="event-day">${d.day}</div>
+              <div class="event-month">${d.month}</div>
+            </div>
+            <div class="event-content">
+              <div class="event-title">${e.title}</div>
+              <div class="event-meta">${e.time} · ${e.location}<span class="event-type">${e.type}</span></div>
+            </div>
+          </li>
+        `;
+      }).join('');
+
+      document.getElementById('upcoming-events').innerHTML = html || '<li class="empty-state" style="padding: 24px;"><p>No upcoming events</p></li>';
+    }
+
+    init();
+  </script>
+</body>
+</html>

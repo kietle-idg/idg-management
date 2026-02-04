@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My View | IDGX Capital</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Navigation -->
+    <nav class="navbar">
+      <div class="navbar-inner">
+        <a href="index.html" class="navbar-brand">
+          <div class="navbar-logo">IDGX</div>
+          <span>IDGX Capital</span>
+        </a>
+        
+        <div class="navbar-nav">
+          <a href="index.html" class="nav-link">Dashboard</a>
+          <a href="portfolio.html" class="nav-link" id="nav-portfolio">Portfolio</a>
+          <a href="personal.html" class="nav-link active">My View</a>
+        </div>
+
+        <div class="navbar-user">
+          <div class="user-menu">
+            <button class="user-button">
+              <div class="user-avatar" id="user-avatar">--</div>
+              <span id="user-name">Loading...</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 9l6 6 6-6"/>
+              </svg>
+            </button>
+            <div class="user-dropdown">
+              <div class="dropdown-item" style="pointer-events: none; padding-bottom: 8px;">
+                <small style="color: var(--text-muted);">Signed in as <span id="user-role-text">-</span></small>
+              </div>
+              <div class="dropdown-divider"></div>
+              <div id="user-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main">
+      <div class="container container-lg">
+        <!-- Loading State -->
+        <div id="loading-state" class="loading">
+          <div class="spinner"></div>
+        </div>
+
+        <!-- Personal Content -->
+        <div id="personal-content" class="hidden">
+          <!-- Page Header with Date -->
+          <div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <h1 class="page-title">Welcome back, <span id="greeting-name">User</span></h1>
+              <p class="page-subtitle">Here's what's on your plate today</p>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 32px; font-weight: 600; color: var(--text-primary);" id="today-date"></div>
+              <div style="color: var(--text-muted);" id="today-day"></div>
+            </div>
+          </div>
+
+          <!-- Two Column Layout -->
+          <div class="grid-2">
+            <!-- Upcoming Events -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">Upcoming Events</h3>
+              </div>
+              <div class="card-body">
+                <ul class="list" id="events-list"></ul>
+              </div>
+            </div>
+
+            <!-- Action Items -->
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">Action Items</h3>
+                <span class="badge badge-primary" id="tasks-count">0</span>
+              </div>
+              <div class="card-body">
+                <ul class="list" id="tasks-list"></ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- My Companies -->
+          <div id="my-companies-section" class="card mt-8 hidden">
+            <div class="card-header">
+              <h3 class="card-title">My Portfolio Companies</h3>
+            </div>
+            <div class="card-body no-padding">
+              <div class="table-container">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Company</th>
+                      <th>Stage</th>
+                      <th class="text-right">Valuation</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="my-companies-table"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    async function init() {
+      await loadAllData();
+      renderNavbar();
+      
+      const user = getCurrentUser();
+      
+      // Update greeting
+      document.getElementById('greeting-name').textContent = user?.name?.split(' ')[0] || 'there';
+      
+      // Update date
+      const today = new Date();
+      document.getElementById('today-date').textContent = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      document.getElementById('today-day').textContent = today.toLocaleDateString('en-US', { weekday: 'long' });
+
+      renderEvents();
+      renderTasks();
+      
+      if (user?.role !== 'LP') {
+        renderMyCompanies();
+      }
+      
+      document.getElementById('loading-state').classList.add('hidden');
+      document.getElementById('personal-content').classList.remove('hidden');
+    }
+
+    function renderEvents() {
+      const user = getCurrentUser();
+      let events = eventsData
+        .filter(e => getDaysUntil(e.date) >= 0)
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+      // Filter by attendee
+      if (user?.id) {
+        events = events.filter(e => e.attendees?.includes(user.id) || user.role === 'GP');
+      }
+      
+      events = events.slice(0, 8);
+
+      const html = events.map(e => {
+        const d = formatDateShort(e.date);
+        return `
+          <li class="list-item">
+            <div class="event-date">
+              <div class="event-day">${d.day}</div>
+              <div class="event-month">${d.month}</div>
+            </div>
+            <div class="event-content">
+              <div class="event-title">${e.title}</div>
+              <div class="event-meta">${e.time} · ${e.location}<span class="event-type">${e.type}</span></div>
+            </div>
+          </li>
+        `;
+      }).join('');
+
+      document.getElementById('events-list').innerHTML = html || '<li class="empty-state" style="padding: 24px;"><p>No upcoming events</p></li>';
+    }
+
+    function renderTasks() {
+      const user = getCurrentUser();
+      let tasks = tasksData
+        .filter(t => t.status !== 'completed')
+        .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+
+      // Filter by assignee
+      if (user?.id) {
+        tasks = tasks.filter(t => t.assignee === user.id || user.role === 'GP');
+      }
+      
+      tasks = tasks.slice(0, 8);
+      
+      document.getElementById('tasks-count').textContent = tasks.length;
+
+      const html = tasks.map(t => {
+        const days = getDaysUntil(t.dueDate);
+        let dueText = formatDate(t.dueDate);
+        let overdue = false;
+        
+        if (days < 0) {
+          dueText = `${Math.abs(days)} days overdue`;
+          overdue = true;
+        } else if (days === 0) {
+          dueText = 'Due today';
+        } else if (days === 1) {
+          dueText = 'Due tomorrow';
+        }
+
+        return `
+          <li class="task-item">
+            <div class="task-checkbox"></div>
+            <div class="task-content">
+              <div class="task-title">${t.title}</div>
+              <div class="task-meta">${t.type}</div>
+            </div>
+            <div class="task-due ${overdue ? 'overdue' : ''}">
+              <span class="badge badge-${t.priority === 'high' ? 'danger' : t.priority === 'medium' ? 'warning' : 'default'}">${t.priority}</span>
+              <div style="margin-top: 4px; font-size: 13px;">${dueText}</div>
+            </div>
+          </li>
+        `;
+      }).join('');
+
+      document.getElementById('tasks-list').innerHTML = html || '<li class="empty-state" style="padding: 24px;"><p>No pending tasks</p></li>';
+    }
+
+    function renderMyCompanies() {
+      const user = getCurrentUser();
+      let companies = [];
+      
+      if (user?.role === 'Team' && user.portfolioCompanies) {
+        companies = companiesData.filter(c => user.portfolioCompanies.includes(c.id));
+      } else if (user?.role === 'GP') {
+        companies = companiesData.filter(c => c.status === 'Active').slice(0, 6);
+      }
+
+      if (companies.length === 0) return;
+      
+      document.getElementById('my-companies-section').classList.remove('hidden');
+
+      const html = companies.map(c => `
+        <tr>
+          <td>
+            <div class="company-cell">
+              <div class="company-icon">${c.logo || c.name?.charAt(0)}</div>
+              <div>
+                <div class="company-name">${c.name}</div>
+                <div class="company-sector">${c.sector}</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="badge ${getStageBadgeClass(c.stage)}">${c.stage}</span></td>
+          <td class="text-right value">${formatCurrency(c.currentValuation)}</td>
+          <td><span class="badge ${c.status === 'Active' ? 'badge-success' : 'badge-default'}">${c.status}</span></td>
+        </tr>
+      `).join('');
+
+      document.getElementById('my-companies-table').innerHTML = html;
+    }
+
+    init();
+  </script>
+</body>
+</html>
