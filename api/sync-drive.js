@@ -210,102 +210,76 @@ module.exports = async function handler(req, res) {
     for (const folder of companyFolders) {
       try {
         const files = await listFilesInFolder(drive, folder.id);
-        
-        if (files.length === 0) {
-          results.push({
-            companyName: folder.name,
-            status: 'no_files',
-            filesFound: 0,
-            filesProcessed: 0
-          });
-          continue;
-        }
-
-        let combinedContent = '';
-        let processedCount = 0;
-        
-        for (const file of files.slice(0, 5)) {
-          const content = await getFileContent(drive, file);
-          if (content && !content.startsWith('[Could not read')) {
-            combinedContent += `\n\n--- ${file.name} ---\n${content}`;
-            processedCount++;
-          }
-        }
-
-        let extractedData = null;
         let savedToFirebase = false;
         
-        if (combinedContent.length > 50) {
-          extractedData = await extractPortfolioData(folder.name, combinedContent);
+        // Always create/update company from folder - user will fill details later
+        if (db) {
+          // Clean up folder name (remove numbering like "1. " or "5.6. ")
+          let companyName = folder.name.replace(/^\d+(\.\d+)*\.?\s*/, '').trim();
+          // Handle names like "Company (OldName)" - use the main name
+          const mainName = companyName.split('(')[0].trim();
           
-          // Save to Firebase if data was extracted
-          if (extractedData && db) {
-            const companyData = {
-              name: extractedData.name || folder.name,
-              sector: extractedData.sector || 'Other',
-              stage: extractedData.stage || 'Seed',
-              status: extractedData.status || 'Active',
-              investmentDate: extractedData.investmentDate || null,
-              investmentAmount: extractedData.investmentAmount || 0,
-              currentValuation: extractedData.currentValuation || 0,
-              ownership: extractedData.ownership || 0,
-              founder: extractedData.founder || null,
-              founderEmail: extractedData.founderEmail || null,
-              location: extractedData.location || null,
-              description: extractedData.description || null,
-              lastUpdate: extractedData.lastUpdate || null,
-              driveFolderId: folder.id,
-              syncedAt: admin.firestore.FieldValue.serverTimestamp(),
-              updatedAt: admin.firestore.FieldValue.serverTimestamp()
-            };
-            
-            // Check if company already exists
-            const existing = await db.collection('companies')
-              .where('driveFolderId', '==', folder.id)
+          const companyData = {
+            name: companyName,
+            displayName: mainName,
+            sector: null,
+            stage: null,
+            status: 'Active',
+            investmentDate: null,
+            investmentAmount: null,
+            currentValuation: null,
+            ownership: null,
+            founder: null,
+            founderEmail: null,
+            location: null,
+            description: null,
+            driveFolderId: folder.id,
+            driveFileCount: files.length,
+            syncedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          };
+          
+          // Check if company already exists by driveFolderId
+          const existing = await db.collection('companies')
+            .where('driveFolderId', '==', folder.id)
+            .limit(1)
+            .get();
+          
+          if (!existing.empty) {
+            // Update only sync-related fields, preserve user-edited data
+            await existing.docs[0].ref.update({
+              driveFileCount: files.length,
+              syncedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            savedToFirebase = true;
+          } else {
+            // Check by name similarity
+            const byName = await db.collection('companies')
+              .where('name', '==', companyName)
               .limit(1)
               .get();
             
-            if (!existing.empty) {
-              await existing.docs[0].ref.update(companyData);
+            if (!byName.empty) {
+              await byName.docs[0].ref.update({
+                driveFolderId: folder.id,
+                driveFileCount: files.length,
+                syncedAt: admin.firestore.FieldValue.serverTimestamp()
+              });
               savedToFirebase = true;
             } else {
-              const byName = await db.collection('companies')
-                .where('name', '==', companyData.name)
-                .limit(1)
-                .get();
-              
-              if (!byName.empty) {
-                await byName.docs[0].ref.update(companyData);
-                savedToFirebase = true;
-              } else {
-                companyData.createdAt = admin.firestore.FieldValue.serverTimestamp();
-                await db.collection('companies').add(companyData);
-                savedToFirebase = true;
-              }
+              // Create new company
+              companyData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+              await db.collection('companies').add(companyData);
+              savedToFirebase = true;
             }
           }
         }
-        
-        // Count file types
-        const fileTypes = {};
-        files.forEach(f => {
-          const type = f.mimeType.includes('google-apps.spreadsheet') ? 'Google Sheets' :
-                       f.mimeType.includes('google-apps.document') ? 'Google Docs' :
-                       f.mimeType.includes('pdf') ? 'PDF' :
-                       f.mimeType.includes('spreadsheet') || f.mimeType.includes('excel') ? 'Excel' :
-                       f.mimeType.includes('word') || f.mimeType.includes('document') ? 'Word' :
-                       'Other';
-          fileTypes[type] = (fileTypes[type] || 0) + 1;
-        });
 
         results.push({
           companyName: folder.name,
           filesFound: files.length,
-          filesProcessed: processedCount,
-          fileTypes,
-          status: savedToFirebase ? 'success' : (extractedData ? 'extracted_not_saved' : 'no_data_extracted'),
-          savedToFirebase,
-          extractedFields: extractedData ? Object.keys(extractedData).filter(k => extractedData[k] !== null) : []
+          status: savedToFirebase ? 'success' : 'not_saved',
+          savedToFirebase
         });
 
       } catch (error) {
