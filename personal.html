@@ -23,6 +23,8 @@
           <a href="index.html" class="nav-link">Dashboard</a>
           <a href="portfolio.html" class="nav-link" id="nav-portfolio">Portfolio</a>
           <a href="personal.html" class="nav-link active">My View</a>
+          <a href="documents.html" class="nav-link" id="nav-documents">Documents</a>
+          <a href="admin.html" class="nav-link" id="nav-admin">Admin</a>
         </div>
 
         <div class="navbar-user">
@@ -39,7 +41,7 @@
                 <small style="color: var(--text-muted);">Signed in as <span id="user-role-text">-</span></small>
               </div>
               <div class="dropdown-divider"></div>
-              <div id="user-list"></div>
+              <button class="dropdown-item" onclick="Auth.signOut()">Sign out</button>
             </div>
           </div>
         </div>
@@ -118,13 +120,43 @@
     </main>
   </div>
 
-  <script src="app.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="auth.js"></script>
+  <script src="database.js"></script>
+  
   <script>
+    let companiesData = [];
+    let eventsData = [];
+    let tasksData = [];
+
     async function init() {
-      await loadAllData();
-      renderNavbar();
+      // Check authentication
+      await Auth.init();
       
-      const user = getCurrentUser();
+      if (!Auth.isAuthenticated()) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      const user = Auth.currentUserData;
+      const role = user?.role;
+
+      // Update navbar
+      document.getElementById('user-name').textContent = user?.name || 'User';
+      document.getElementById('user-avatar').textContent = user?.name?.split(' ').map(n => n[0]).join('') || '?';
+      document.getElementById('user-role-text').textContent = role || '';
+
+      // Show/hide nav items based on role
+      if (role !== 'Admin') {
+        document.getElementById('nav-admin').style.display = 'none';
+      }
+      if (role === 'LP') {
+        document.getElementById('nav-portfolio').style.display = 'none';
+      }
       
       // Update greeting
       document.getElementById('greeting-name').textContent = user?.name?.split(' ')[0] || 'there';
@@ -134,10 +166,15 @@
       document.getElementById('today-date').textContent = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       document.getElementById('today-day').textContent = today.toLocaleDateString('en-US', { weekday: 'long' });
 
+      // Load data from Firebase
+      companiesData = await Database.getCompanies();
+      eventsData = await Database.getEvents();
+      tasksData = await Database.getTasks();
+
       renderEvents();
       renderTasks();
       
-      if (user?.role !== 'LP') {
+      if (role !== 'LP') {
         renderMyCompanies();
       }
       
@@ -145,15 +182,55 @@
       document.getElementById('personal-content').classList.remove('hidden');
     }
 
+    // Formatting functions
+    function formatCurrency(amount) {
+      if (!amount) return '$0';
+      if (amount >= 1000000000) return '$' + (amount / 1000000000).toFixed(1) + 'B';
+      if (amount >= 1000000) return '$' + (amount / 1000000).toFixed(1) + 'M';
+      if (amount >= 1000) return '$' + (amount / 1000).toFixed(0) + 'K';
+      return '$' + amount.toLocaleString();
+    }
+
+    function formatDate(dateString) {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function formatDateShort(dateString) {
+      if (!dateString) return { day: '--', month: '---' };
+      const date = new Date(dateString);
+      return {
+        day: date.getDate(),
+        month: date.toLocaleDateString('en-US', { month: 'short' })
+      };
+    }
+
+    function getDaysUntil(dateString) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const target = new Date(dateString);
+      target.setHours(0, 0, 0, 0);
+      return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+    }
+
+    function getStageBadgeClass(stage) {
+      if (stage === 'Seed') return 'badge-warning';
+      if (stage === 'Series A') return 'badge-success';
+      if (stage === 'Series B') return 'badge-primary';
+      if (stage === 'Exited') return 'badge-default';
+      return 'badge-default';
+    }
+
     function renderEvents() {
-      const user = getCurrentUser();
+      const user = Auth.currentUserData;
       let events = eventsData
         .filter(e => getDaysUntil(e.date) >= 0)
         .sort((a, b) => new Date(a.date) - new Date(b.date));
 
       // Filter by attendee
       if (user?.id) {
-        events = events.filter(e => e.attendees?.includes(user.id) || user.role === 'GP');
+        events = events.filter(e => e.attendees?.includes(user.id) || user.role === 'GP' || user.role === 'Admin');
       }
       
       events = events.slice(0, 8);
@@ -178,14 +255,14 @@
     }
 
     function renderTasks() {
-      const user = getCurrentUser();
+      const user = Auth.currentUserData;
       let tasks = tasksData
         .filter(t => t.status !== 'completed')
         .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
 
       // Filter by assignee
       if (user?.id) {
-        tasks = tasks.filter(t => t.assignee === user.id || user.role === 'GP');
+        tasks = tasks.filter(t => t.assignee === user.id || user.role === 'GP' || user.role === 'Admin');
       }
       
       tasks = tasks.slice(0, 8);
@@ -225,12 +302,12 @@
     }
 
     function renderMyCompanies() {
-      const user = getCurrentUser();
+      const user = Auth.currentUserData;
       let companies = [];
       
-      if (user?.role === 'Team' && user.portfolioCompanies) {
-        companies = companiesData.filter(c => user.portfolioCompanies.includes(c.id));
-      } else if (user?.role === 'GP') {
+      if (user?.role === 'Team' && user.assignedCompanies) {
+        companies = companiesData.filter(c => user.assignedCompanies.includes(c.id));
+      } else if (user?.role === 'GP' || user?.role === 'Admin') {
         companies = companiesData.filter(c => c.status === 'Active').slice(0, 6);
       }
 

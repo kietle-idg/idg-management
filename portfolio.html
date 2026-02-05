@@ -23,6 +23,8 @@
           <a href="index.html" class="nav-link">Dashboard</a>
           <a href="portfolio.html" class="nav-link active" id="nav-portfolio">Portfolio</a>
           <a href="personal.html" class="nav-link">My View</a>
+          <a href="documents.html" class="nav-link" id="nav-documents">Documents</a>
+          <a href="admin.html" class="nav-link" id="nav-admin">Admin</a>
         </div>
 
         <div class="navbar-user">
@@ -39,7 +41,7 @@
                 <small style="color: var(--text-muted);">Signed in as <span id="user-role-text">-</span></small>
               </div>
               <div class="dropdown-divider"></div>
-              <div id="user-list"></div>
+              <button class="dropdown-item" onclick="Auth.signOut()">Sign out</button>
             </div>
           </div>
         </div>
@@ -148,7 +150,13 @@
     </main>
   </div>
 
-  <script src="app.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="auth.js"></script>
+  <script src="database.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -156,18 +164,38 @@
   <script>
     let currentFilter = 'all';
     let currentSearch = '';
+    let companiesData = [];
 
     async function init() {
-      await loadAllData();
-      renderNavbar();
+      // Check authentication
+      await Auth.init();
       
-      const user = getCurrentUser();
+      if (!Auth.isAuthenticated()) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      const user = Auth.currentUserData;
+      const role = user?.role;
+
+      // Update navbar
+      document.getElementById('user-name').textContent = user?.name || 'User';
+      document.getElementById('user-avatar').textContent = user?.name?.split(' ').map(n => n[0]).join('') || '?';
+      document.getElementById('user-role-text').textContent = role || '';
+
+      // Show/hide nav items based on role
+      if (role !== 'Admin') {
+        document.getElementById('nav-admin').style.display = 'none';
+      }
       
       // LP cannot view portfolio
-      if (user?.role === 'LP') {
+      if (role === 'LP') {
         window.location.href = 'index.html';
         return;
       }
+
+      // Load companies from Firebase
+      companiesData = await Database.getCompanies();
 
       renderSummary();
       renderTable();
@@ -177,13 +205,30 @@
       document.getElementById('portfolio-content').classList.remove('hidden');
     }
 
+    // Formatting functions
+    function formatCurrency(amount) {
+      if (!amount) return '$0';
+      if (amount >= 1000000000) return '$' + (amount / 1000000000).toFixed(1) + 'B';
+      if (amount >= 1000000) return '$' + (amount / 1000000).toFixed(1) + 'M';
+      if (amount >= 1000) return '$' + (amount / 1000).toFixed(0) + 'K';
+      return '$' + amount.toLocaleString();
+    }
+
+    function getStageBadgeClass(stage) {
+      if (stage === 'Seed') return 'badge-warning';
+      if (stage === 'Series A') return 'badge-success';
+      if (stage === 'Series B') return 'badge-primary';
+      if (stage === 'Exited') return 'badge-default';
+      return 'badge-default';
+    }
+
     function renderSummary() {
-      const user = getCurrentUser();
+      const user = Auth.currentUserData;
       let companies = companiesData;
       
       // Team sees only assigned companies
-      if (user?.role === 'Team' && user.portfolioCompanies) {
-        companies = companiesData.filter(c => user.portfolioCompanies.includes(c.id));
+      if (user?.role === 'Team' && user.assignedCompanies) {
+        companies = companiesData.filter(c => user.assignedCompanies.includes(c.id));
       }
 
       const active = companies.filter(c => c.status === 'Active');
@@ -197,12 +242,12 @@
     }
 
     function renderTable() {
-      const user = getCurrentUser();
+      const user = Auth.currentUserData;
       let companies = [...companiesData];
       
       // Team sees only assigned companies
-      if (user?.role === 'Team' && user.portfolioCompanies) {
-        companies = companies.filter(c => user.portfolioCompanies.includes(c.id));
+      if (user?.role === 'Team' && user.assignedCompanies) {
+        companies = companies.filter(c => user.assignedCompanies.includes(c.id));
       }
 
       // Apply filter
@@ -262,6 +307,56 @@
         currentSearch = e.target.value;
         renderTable();
       });
+    }
+
+    // Export functions
+    function exportToPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      
+      doc.setFontSize(20);
+      doc.text('IDGX Capital - Portfolio Companies', 14, 22);
+      doc.setFontSize(10);
+      doc.text('Generated: ' + new Date().toLocaleDateString(), 14, 30);
+
+      const tableData = companiesData.map(c => [
+        c.name,
+        c.stage,
+        formatCurrency(c.investmentAmount),
+        formatCurrency(c.currentValuation),
+        (c.ownership || 0).toFixed(1) + '%',
+        c.status
+      ]);
+
+      doc.autoTable({
+        head: [['Company', 'Stage', 'Invested', 'Valuation', 'Ownership', 'Status']],
+        body: tableData,
+        startY: 40,
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [124, 58, 237] }
+      });
+
+      doc.save('idg-portfolio.pdf');
+    }
+
+    function exportToExcel() {
+      const data = companiesData.map(c => ({
+        'Company': c.name,
+        'Sector': c.sector,
+        'Stage': c.stage,
+        'Investment Date': c.investmentDate,
+        'Invested': c.investmentAmount,
+        'Valuation': c.currentValuation,
+        'Ownership %': c.ownership,
+        'Founder': c.founder,
+        'Status': c.status,
+        'Location': c.location
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Portfolio');
+      XLSX.writeFile(wb, 'idg-portfolio.xlsx');
     }
 
     init();

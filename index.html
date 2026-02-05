@@ -23,6 +23,8 @@
           <a href="index.html" class="nav-link active">Dashboard</a>
           <a href="portfolio.html" class="nav-link" id="nav-portfolio">Portfolio</a>
           <a href="personal.html" class="nav-link">My View</a>
+          <a href="documents.html" class="nav-link" id="nav-documents">Documents</a>
+          <a href="admin.html" class="nav-link" id="nav-admin">Admin</a>
         </div>
 
         <div class="navbar-user">
@@ -39,7 +41,7 @@
                 <small style="color: var(--text-muted);">Signed in as <span id="user-role-text">-</span></small>
               </div>
               <div class="dropdown-divider"></div>
-              <div id="user-list"></div>
+              <button class="dropdown-item" onclick="Auth.signOut()">Sign out</button>
             </div>
           </div>
         </div>
@@ -163,14 +165,48 @@
     </main>
   </div>
 
-  <script src="app.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="auth.js"></script>
+  <script src="database.js"></script>
+  
   <script>
+    let fundData = null;
+    let companiesData = [];
+    let eventsData = [];
+
     async function init() {
-      await loadAllData();
-      renderNavbar();
+      // Check authentication
+      await Auth.init();
       
-      const user = getCurrentUser();
+      if (!Auth.isAuthenticated()) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      const user = Auth.currentUserData;
       const role = user?.role;
+
+      // Update navbar
+      document.getElementById('user-name').textContent = user?.name || 'User';
+      document.getElementById('user-avatar').textContent = user?.name?.split(' ').map(n => n[0]).join('') || '?';
+      document.getElementById('user-role-text').textContent = role || '';
+
+      // Show/hide nav items based on role
+      if (role !== 'Admin') {
+        document.getElementById('nav-admin').style.display = 'none';
+      }
+      if (role === 'LP') {
+        document.getElementById('nav-portfolio').style.display = 'none';
+      }
+
+      // Load data from Firebase
+      fundData = await Database.getFund();
+      companiesData = await Database.getCompanies();
+      eventsData = await Database.getEvents();
 
       // Role-based view
       if (role === 'LP') {
@@ -201,6 +237,44 @@
       
       document.getElementById('loading-state').classList.add('hidden');
       document.getElementById('dashboard-content').classList.remove('hidden');
+    }
+
+    // Formatting functions
+    function formatCurrency(amount) {
+      if (!amount) return '$0';
+      if (amount >= 1000000000) return '$' + (amount / 1000000000).toFixed(1) + 'B';
+      if (amount >= 1000000) return '$' + (amount / 1000000).toFixed(1) + 'M';
+      if (amount >= 1000) return '$' + (amount / 1000).toFixed(0) + 'K';
+      return '$' + amount.toLocaleString();
+    }
+
+    function formatPercent(value) {
+      return (value || 0).toFixed(1) + '%';
+    }
+
+    function formatDateShort(dateString) {
+      if (!dateString) return { day: '--', month: '---' };
+      const date = new Date(dateString);
+      return {
+        day: date.getDate(),
+        month: date.toLocaleDateString('en-US', { month: 'short' })
+      };
+    }
+
+    function getDaysUntil(dateString) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const target = new Date(dateString);
+      target.setHours(0, 0, 0, 0);
+      return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+    }
+
+    function getStageBadgeClass(stage) {
+      if (stage === 'Seed') return 'badge-warning';
+      if (stage === 'Series A') return 'badge-success';
+      if (stage === 'Series B') return 'badge-primary';
+      if (stage === 'Exited') return 'badge-default';
+      return 'badge-default';
     }
 
     function renderMetrics() {
@@ -247,7 +321,7 @@
     }
 
     function renderEvents() {
-      const user = getCurrentUser();
+      const user = Auth.currentUserData;
       let events = eventsData
         .filter(e => getDaysUntil(e.date) >= 0)
         .sort((a, b) => new Date(a.date) - new Date(b.date));
