@@ -392,13 +392,7 @@
     }
 
     function renderSummary() {
-      const user = Auth.currentUserData;
       let companies = companiesData;
-      
-      // Team sees only assigned companies
-      if (user?.role === 'Team' && user.assignedCompanies) {
-        companies = companiesData.filter(c => user.assignedCompanies.includes(c.id));
-      }
 
       const active = companies.filter(c => c.status === 'Active');
       const totalInvested = companies.reduce((sum, c) => sum + (c.investmentAmount || 0), 0);
@@ -411,13 +405,7 @@
     }
 
     function renderTable() {
-      const user = Auth.currentUserData;
       let companies = [...companiesData];
-      
-      // Team sees only assigned companies
-      if (user?.role === 'Team' && user.assignedCompanies) {
-        companies = companies.filter(c => user.assignedCompanies.includes(c.id));
-      }
 
       // Apply filter
       if (currentFilter === 'active') {
