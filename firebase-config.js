@@ -10,12 +10,12 @@
 // 5. Register your app and copy the config values below
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCdZr2EYFmUrhUAboxDWI05TGIYnr8eEas",
+  authDomain: "idg-management.firebaseapp.com",
+  projectId: "idg-management",
+  storageBucket: "idg-management.firebasestorage.app",
+  messagingSenderId: "728812948064",
+  appId: "1:728812948064:web:9603b994a74bf87d9a1105"
 };
 
 // Initialize Firebase
