@@ -65,13 +65,8 @@ async function listFilesInFolder(drive, folderId, depth = 0) {
     if (item.mimeType === 'application/vnd.google-apps.folder') {
       const subFiles = await listFilesInFolder(drive, item.id, depth + 1);
       files = files.concat(subFiles);
-    } else if (
-      item.mimeType === 'application/vnd.google-apps.spreadsheet' ||
-      item.mimeType === 'application/vnd.google-apps.document' ||
-      item.mimeType === 'text/plain' ||
-      item.mimeType === 'text/csv'
-    ) {
-      // Only process Google Docs, Sheets, and text files for now
+    } else {
+      // Include all file types - we'll handle them in getFileContent
       files.push(item);
     }
   }
@@ -102,12 +97,16 @@ async function getFileContent(drive, file) {
         alt: 'media'
       }, { responseType: 'text' });
       content = response.data;
+    } else {
+      // For PDFs, Excel, Word - we can't read them directly in serverless
+      // but we note the file name which often contains useful info
+      content = `[Binary file: ${file.name}] - File type: ${file.mimeType}`;
     }
     
     return content.substring(0, 8000);
   } catch (error) {
     console.error(`Error reading file ${file.name}:`, error.message);
-    return `[Could not read: ${file.name}]`;
+    return `[Could not read: ${file.name}] Error: ${error.message}`;
   }
 }
 
@@ -287,12 +286,26 @@ module.exports = async function handler(req, res) {
           }
         }
         
+        // Count file types
+        const fileTypes = {};
+        files.forEach(f => {
+          const type = f.mimeType.includes('google-apps.spreadsheet') ? 'Google Sheets' :
+                       f.mimeType.includes('google-apps.document') ? 'Google Docs' :
+                       f.mimeType.includes('pdf') ? 'PDF' :
+                       f.mimeType.includes('spreadsheet') || f.mimeType.includes('excel') ? 'Excel' :
+                       f.mimeType.includes('word') || f.mimeType.includes('document') ? 'Word' :
+                       'Other';
+          fileTypes[type] = (fileTypes[type] || 0) + 1;
+        });
+
         results.push({
           companyName: folder.name,
           filesFound: files.length,
           filesProcessed: processedCount,
+          fileTypes,
           status: savedToFirebase ? 'success' : (extractedData ? 'extracted_not_saved' : 'no_data_extracted'),
-          savedToFirebase
+          savedToFirebase,
+          extractedFields: extractedData ? Object.keys(extractedData).filter(k => extractedData[k] !== null) : []
         });
 
       } catch (error) {

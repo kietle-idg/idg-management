@@ -633,19 +633,35 @@
           </div>
         `;
         
-        resultsHtml += '<div style="max-height: 300px; overflow-y: auto;">';
+        resultsHtml += '<div style="max-height: 400px; overflow-y: auto;">';
         for (const result of results) {
           const statusIcon = result.status === 'success' || result.savedToFirebase ? '✓' : result.status === 'no_files' ? '📁' : '⚠️';
           const statusColor = result.status === 'success' || result.savedToFirebase ? '#065F46' : '#92400E';
+          
+          // Show file types breakdown
+          let fileTypesStr = '';
+          if (result.fileTypes) {
+            fileTypesStr = Object.entries(result.fileTypes)
+              .map(([type, count]) => `${count} ${type}`)
+              .join(', ');
+          }
+          
           resultsHtml += `
-            <div style="padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-              <div>
-                <strong>${result.companyName}</strong>
-                <div style="font-size: 13px; color: var(--text-muted);">
-                  ${result.filesFound || 0} files found, ${result.filesProcessed || 0} processed
+            <div style="padding: 12px; border-bottom: 1px solid var(--border);">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <strong>${result.companyName}</strong>
+                  <div style="font-size: 13px; color: var(--text-muted);">
+                    ${result.filesFound || 0} files (${fileTypesStr || 'none'})
+                  </div>
                 </div>
+                <span style="color: ${statusColor}; font-size: 13px;">${statusIcon} ${result.status}</span>
               </div>
-              <span style="color: ${statusColor};">${statusIcon} ${result.status}</span>
+              ${result.extractedFields && result.extractedFields.length > 0 ? `
+                <div style="font-size: 12px; color: #059669; margin-top: 4px;">
+                  Extracted: ${result.extractedFields.join(', ')}
+                </div>
+              ` : ''}
             </div>
           `;
         }
