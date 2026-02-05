@@ -596,6 +596,8 @@
     // Save a company to Firebase
     async function saveCompanyToFirebase(company) {
       try {
+        console.log('Saving company:', company.name);
+        
         // Check if company already exists by driveFolderId
         const existing = await firebaseDb.collection('companies')
           .where('driveFolderId', '==', company.driveFolderId)
@@ -605,9 +607,10 @@
         if (!existing.empty) {
           // Update only sync-related fields, preserve user-edited data
           await existing.docs[0].ref.update({
-            driveFileCount: company.driveFileCount,
+            driveFileCount: company.driveFileCount || 0,
             syncedAt: firebase.firestore.FieldValue.serverTimestamp()
           });
+          console.log('Updated existing company by folderId:', company.name);
           return true;
         }
         
@@ -620,30 +623,32 @@
         if (!byName.empty) {
           await byName.docs[0].ref.update({
             driveFolderId: company.driveFolderId,
-            driveFileCount: company.driveFileCount,
+            driveFileCount: company.driveFileCount || 0,
             syncedAt: firebase.firestore.FieldValue.serverTimestamp()
           });
+          console.log('Updated existing company by name:', company.name);
           return true;
         }
         
         // Create new company
-        await firebaseDb.collection('companies').add({
+        const docRef = await firebaseDb.collection('companies').add({
           name: company.name,
-          displayName: company.displayName,
+          displayName: company.displayName || company.name,
           driveFolderId: company.driveFolderId,
-          driveFileCount: company.driveFileCount,
+          driveFileCount: company.driveFileCount || 0,
           status: 'Active',
-          sector: null,
-          stage: null,
-          investmentAmount: null,
-          currentValuation: null,
-          ownership: null,
-          founder: null,
-          location: null,
-          description: null,
+          sector: 'Other',
+          stage: 'Seed',
+          investmentAmount: 0,
+          currentValuation: 0,
+          ownership: 0,
+          founder: '',
+          location: '',
+          description: '',
           createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           syncedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
+        console.log('Created new company:', company.name, docRef.id);
         return true;
       } catch (error) {
         console.error('Error saving company:', company.name, error);
