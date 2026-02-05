@@ -72,12 +72,31 @@
 
           <!-- Two Column Layout -->
           <div class="grid-2">
-            <!-- Upcoming Events -->
+            <!-- Upcoming Events from Google Calendar -->
             <div class="card">
               <div class="card-header">
-                <h3 class="card-title">Upcoming Events</h3>
+                <h3 class="card-title">📅 My Calendar</h3>
+                <button class="btn btn-ghost btn-sm" id="connect-calendar-btn" onclick="connectGoogleCalendar()" style="display: none;">
+                  Connect Calendar
+                </button>
               </div>
               <div class="card-body">
+                <div id="calendar-loading" style="display: none; padding: 24px; text-align: center;">
+                  <div class="spinner" style="margin: 0 auto;"></div>
+                  <p style="margin-top: 12px; color: var(--text-muted);">Loading calendar...</p>
+                </div>
+                <div id="calendar-connect" style="display: none; padding: 24px; text-align: center;">
+                  <p style="color: var(--text-muted); margin-bottom: 16px;">Connect your Google Calendar to see upcoming events</p>
+                  <button class="btn btn-primary" onclick="connectGoogleCalendar()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                      <line x1="16" y1="2" x2="16" y2="6"></line>
+                      <line x1="8" y1="2" x2="8" y2="6"></line>
+                      <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    Connect Google Calendar
+                  </button>
+                </div>
                 <ul class="list" id="events-list"></ul>
               </div>
             </div>
@@ -128,10 +147,200 @@
   <script src="auth.js"></script>
   <script src="database.js"></script>
   
+  <!-- Google API for Calendar -->
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://accounts.google.com/gsi/client"></script>
+  
   <script>
     let companiesData = [];
     let eventsData = [];
     let tasksData = [];
+    let calendarEvents = [];
+    
+    // Google Calendar Config - uses same project as Google Drive
+    const GOOGLE_CLIENT_ID = '728812948064-XXXXX.apps.googleusercontent.com'; // Will be set from env
+    const CALENDAR_SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
+    let tokenClient = null;
+    let gapiInited = false;
+    let gisInited = false;
+
+    // Initialize Google API
+    function initGoogleAPI() {
+      gapi.load('client', async () => {
+        await gapi.client.init({
+          discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
+        });
+        gapiInited = true;
+        maybeLoadCalendar();
+      });
+    }
+
+    // Check if we have a stored token
+    function getStoredCalendarToken() {
+      return localStorage.getItem('googleCalendarToken');
+    }
+
+    function storeCalendarToken(token) {
+      localStorage.setItem('googleCalendarToken', token);
+    }
+
+    function clearCalendarToken() {
+      localStorage.removeItem('googleCalendarToken');
+    }
+
+    // Connect to Google Calendar
+    async function connectGoogleCalendar() {
+      document.getElementById('calendar-loading').style.display = 'block';
+      document.getElementById('calendar-connect').style.display = 'none';
+      document.getElementById('events-list').innerHTML = '';
+      
+      try {
+        // Use Google Sign-In popup
+        const provider = new firebase.auth.GoogleAuthProvider();
+        provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
+        
+        const result = await firebase.auth().signInWithPopup(provider);
+        const credential = result.credential;
+        const token = credential.accessToken;
+        
+        if (token) {
+          storeCalendarToken(token);
+          await fetchCalendarEvents(token);
+        }
+      } catch (error) {
+        console.error('Calendar connection error:', error);
+        document.getElementById('calendar-loading').style.display = 'none';
+        document.getElementById('calendar-connect').style.display = 'block';
+        showToast('Could not connect to calendar: ' + error.message, true);
+      }
+    }
+
+    // Fetch events from Google Calendar
+    async function fetchCalendarEvents(token) {
+      try {
+        const now = new Date().toISOString();
+        const maxDate = new Date();
+        maxDate.setDate(maxDate.getDate() + 30); // Next 30 days
+        
+        const response = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+          `timeMin=${encodeURIComponent(now)}&` +
+          `timeMax=${encodeURIComponent(maxDate.toISOString())}&` +
+          `maxResults=20&` +
+          `singleEvents=true&` +
+          `orderBy=startTime`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          }
+        );
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            // Token expired, clear and show connect button
+            clearCalendarToken();
+            document.getElementById('calendar-loading').style.display = 'none';
+            document.getElementById('calendar-connect').style.display = 'block';
+            return;
+          }
+          throw new Error('Failed to fetch calendar');
+        }
+        
+        const data = await response.json();
+        calendarEvents = data.items || [];
+        
+        document.getElementById('calendar-loading').style.display = 'none';
+        document.getElementById('connect-calendar-btn').style.display = 'block';
+        document.getElementById('connect-calendar-btn').textContent = 'Refresh';
+        
+        renderCalendarEvents();
+      } catch (error) {
+        console.error('Error fetching calendar:', error);
+        document.getElementById('calendar-loading').style.display = 'none';
+        document.getElementById('calendar-connect').style.display = 'block';
+      }
+    }
+
+    // Try to load calendar if we have a stored token
+    async function maybeLoadCalendar() {
+      const token = getStoredCalendarToken();
+      if (token) {
+        document.getElementById('calendar-loading').style.display = 'block';
+        document.getElementById('calendar-connect').style.display = 'none';
+        await fetchCalendarEvents(token);
+      } else {
+        document.getElementById('calendar-connect').style.display = 'block';
+      }
+    }
+
+    // Render calendar events
+    function renderCalendarEvents() {
+      if (calendarEvents.length === 0) {
+        document.getElementById('events-list').innerHTML = 
+          '<li class="empty-state" style="padding: 24px;"><p>No upcoming events in your calendar</p></li>';
+        return;
+      }
+
+      const html = calendarEvents.map(event => {
+        const start = event.start.dateTime || event.start.date;
+        const date = new Date(start);
+        const d = {
+          day: date.getDate(),
+          month: date.toLocaleDateString('en-US', { month: 'short' })
+        };
+        
+        const time = event.start.dateTime 
+          ? date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+          : 'All day';
+        
+        const location = event.location || 'No location';
+        
+        return `
+          <li class="list-item">
+            <div class="event-date">
+              <div class="event-day">${d.day}</div>
+              <div class="event-month">${d.month}</div>
+            </div>
+            <div class="event-content">
+              <div class="event-title">${event.summary || 'Untitled Event'}</div>
+              <div class="event-meta">${time} · ${location}</div>
+            </div>
+          </li>
+        `;
+      }).join('');
+
+      document.getElementById('events-list').innerHTML = html;
+    }
+
+    // Toast notification
+    function showToast(message, isError = false) {
+      const existing = document.getElementById('toast');
+      if (existing) existing.remove();
+
+      const toast = document.createElement('div');
+      toast.id = 'toast';
+      toast.textContent = message;
+      toast.style.cssText = `
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        padding: 12px 24px;
+        background: ${isError ? '#EF4444' : '#10B981'};
+        color: white;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 9999;
+      `;
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
 
     async function init() {
       // Check authentication
@@ -168,10 +377,11 @@
 
       // Load data from Firebase
       companiesData = await Database.getCompanies();
-      eventsData = await Database.getEvents();
       tasksData = await Database.getTasks();
 
-      renderEvents();
+      // Try to load Google Calendar events
+      maybeLoadCalendar();
+      
       renderTasks();
       
       if (role !== 'LP') {
