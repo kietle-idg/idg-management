@@ -121,6 +121,35 @@
             </div>
           </div>
 
+          <!-- Google Drive Sync -->
+          <div class="card mt-8">
+            <div class="card-header">
+              <h3 class="card-title">📁 Google Drive Sync</h3>
+              <button class="btn btn-primary" onclick="syncFromDrive()" id="sync-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8V3"></path>
+                </svg>
+                Sync Now
+              </button>
+            </div>
+            <div class="card-body">
+              <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                AI-powered sync reads your Google Drive portfolio folders and automatically extracts company data from PDFs, Excel files, and documents.
+              </p>
+              <div id="sync-status" style="display: none; padding: 16px; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 16px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <div class="spinner" style="width: 20px; height: 20px; border-width: 2px;"></div>
+                  <span id="sync-status-text">Syncing...</span>
+                </div>
+              </div>
+              <div id="sync-results" style="display: none;">
+                <h4 style="margin-bottom: 12px;">Last Sync Results</h4>
+                <div id="sync-results-content"></div>
+              </div>
+              <div id="sync-error" style="display: none; padding: 16px; background: #FEE2E2; color: #DC2626; border-radius: 8px;"></div>
+            </div>
+          </div>
+
           <!-- Fund Settings -->
           <div class="card mt-8">
             <div class="card-header">
@@ -547,6 +576,148 @@
     document.getElementById('edit-user-role')?.addEventListener('change', (e) => {
       document.getElementById('edit-commitment-group').style.display = e.target.value === 'LP' ? 'block' : 'none';
     });
+
+    // Google Drive Sync
+    async function syncFromDrive() {
+      const btn = document.getElementById('sync-btn');
+      const statusEl = document.getElementById('sync-status');
+      const statusText = document.getElementById('sync-status-text');
+      const resultsEl = document.getElementById('sync-results');
+      const resultsContent = document.getElementById('sync-results-content');
+      const errorEl = document.getElementById('sync-error');
+
+      // Show loading state
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;margin-right:8px;"></div> Syncing...';
+      statusEl.style.display = 'block';
+      resultsEl.style.display = 'none';
+      errorEl.style.display = 'none';
+      statusText.textContent = 'Connecting to Google Drive...';
+
+      try {
+        const response = await fetch('/api/sync-drive', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Sync failed');
+        }
+
+        statusText.textContent = 'Processing results...';
+
+        // Show results
+        let resultsHtml = `
+          <div style="margin-bottom: 16px; padding: 12px; background: #D1FAE5; color: #065F46; border-radius: 8px;">
+            ✓ Synced ${data.foldersProcessed} company folders at ${new Date(data.timestamp).toLocaleString()}
+          </div>
+        `;
+
+        if (data.results && data.results.length > 0) {
+          resultsHtml += '<div style="max-height: 300px; overflow-y: auto;">';
+          for (const result of data.results) {
+            const statusIcon = result.status === 'success' ? '✓' : result.status === 'no_files' ? '📁' : '⚠️';
+            const statusColor = result.status === 'success' ? '#065F46' : '#92400E';
+            resultsHtml += `
+              <div style="padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <strong>${result.companyName}</strong>
+                  <div style="font-size: 13px; color: var(--text-muted);">
+                    ${result.totalFiles || 0} files found, ${result.filesProcessed || 0} processed
+                  </div>
+                </div>
+                <span style="color: ${statusColor};">${statusIcon} ${result.status}</span>
+              </div>
+            `;
+
+            // If data was extracted successfully, offer to update Firebase
+            if (result.data && result.status === 'success') {
+              // Auto-update or show preview
+              await updateCompanyFromSync(result.companyName, result.data);
+            }
+          }
+          resultsHtml += '</div>';
+        }
+
+        if (data.errors && data.errors.length > 0) {
+          resultsHtml += '<div style="margin-top: 16px; color: #DC2626;">';
+          resultsHtml += '<strong>Errors:</strong><ul>';
+          for (const err of data.errors) {
+            resultsHtml += `<li>${err.companyName}: ${err.error}</li>`;
+          }
+          resultsHtml += '</ul></div>';
+        }
+
+        resultsContent.innerHTML = resultsHtml;
+        statusEl.style.display = 'none';
+        resultsEl.style.display = 'block';
+
+        showToast(`Synced ${data.foldersProcessed} company folders!`);
+
+      } catch (error) {
+        console.error('Sync error:', error);
+        statusEl.style.display = 'none';
+        errorEl.style.display = 'block';
+        errorEl.textContent = 'Sync failed: ' + error.message;
+        showToast('Sync failed: ' + error.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8V3"></path>
+          </svg>
+          Sync Now
+        `;
+      }
+    }
+
+    // Update or create company from sync data
+    async function updateCompanyFromSync(companyName, data) {
+      try {
+        // Check if company already exists
+        const companies = await Database.getCompanies();
+        const existing = companies.find(c => 
+          c.name.toLowerCase() === companyName.toLowerCase() ||
+          c.name.toLowerCase().includes(companyName.toLowerCase()) ||
+          companyName.toLowerCase().includes(c.name.toLowerCase())
+        );
+
+        const companyData = {
+          name: data.name || companyName,
+          sector: data.sector || null,
+          stage: data.stage || 'Seed',
+          status: data.status || 'Active',
+          investmentDate: data.investmentDate || null,
+          investmentAmount: data.investmentAmount || 0,
+          currentValuation: data.currentValuation || 0,
+          ownership: data.ownership || 0,
+          founder: data.founder || null,
+          founderEmail: data.founderEmail || null,
+          location: data.location || null,
+          description: data.description || null,
+          lastSyncedAt: new Date().toISOString()
+        };
+
+        // Remove null values
+        Object.keys(companyData).forEach(key => {
+          if (companyData[key] === null) delete companyData[key];
+        });
+
+        if (existing) {
+          // Update existing company
+          await Database.updateCompany(existing.id, companyData);
+          console.log(`Updated company: ${companyName}`);
+        } else if (data.name || data.sector) {
+          // Create new company only if we have meaningful data
+          await Database.createCompany(companyData);
+          console.log(`Created company: ${companyName}`);
+        }
+      } catch (error) {
+        console.error(`Error updating company ${companyName}:`, error);
+      }
+    }
 
     // Initialize
     initAdmin();
