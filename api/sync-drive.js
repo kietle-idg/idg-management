@@ -3,17 +3,22 @@ const OpenAI = require('openai');
 const admin = require('firebase-admin');
 
 // Initialize Firebase Admin (only once)
-if (!admin.apps.length) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
-  if (serviceAccount.project_id) {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
+let db = null;
+try {
+  if (!admin.apps.length && process.env.FIREBASE_SERVICE_ACCOUNT) {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    if (serviceAccount.project_id) {
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+      });
+      db = admin.firestore();
+    }
+  } else if (admin.apps.length) {
+    db = admin.firestore();
   }
+} catch (e) {
+  console.error('Firebase init error:', e.message);
 }
-
-// Get Firestore reference
-const db = admin.apps.length ? admin.firestore() : null;
 
 // Initialize OpenAI
 const openai = new OpenAI({
@@ -22,6 +27,9 @@ const openai = new OpenAI({
 
 // Initialize Google Drive
 function getGoogleAuth() {
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
+    throw new Error('GOOGLE_SERVICE_ACCOUNT environment variable not set');
+  }
   const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
   const auth = new google.auth.GoogleAuth({
     credentials,
@@ -213,13 +221,31 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+    // Check required environment variables
+    const missingVars = [];
+    if (!process.env.GOOGLE_DRIVE_FOLDER_ID) missingVars.push('GOOGLE_DRIVE_FOLDER_ID');
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT) missingVars.push('GOOGLE_SERVICE_ACCOUNT');
+    if (!process.env.OPENAI_API_KEY) missingVars.push('OPENAI_API_KEY');
     
-    if (!folderId) {
-      return res.status(400).json({ error: 'Google Drive folder ID not configured' });
+    if (missingVars.length > 0) {
+      return res.status(400).json({ 
+        success: false,
+        error: `Missing environment variables: ${missingVars.join(', ')}` 
+      });
     }
 
-    const auth = getGoogleAuth();
+    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+    
+    let auth;
+    try {
+      auth = getGoogleAuth();
+    } catch (authError) {
+      return res.status(400).json({
+        success: false,
+        error: `Google Auth error: ${authError.message}`
+      });
+    }
+    
     const drive = google.drive({ version: 'v3', auth });
 
     // Get all company folders
