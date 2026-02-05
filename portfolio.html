@@ -52,9 +52,18 @@
     <main class="main">
       <div class="container container-lg">
         <!-- Page Header -->
-        <div class="page-header">
-          <h1 class="page-title">Portfolio Companies</h1>
-          <p class="page-subtitle">All investments in IDGX Capital Fund III</p>
+        <div class="page-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h1 class="page-title">Portfolio Companies</h1>
+            <p class="page-subtitle">All investments in IDGX Capital Fund III</p>
+          </div>
+          <button class="btn btn-primary" onclick="showAddCompanyModal()" id="add-company-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Add Company
+          </button>
         </div>
 
         <!-- Loading State -->
@@ -120,6 +129,7 @@
                       <th class="text-right">Ownership</th>
                       <th>Founder</th>
                       <th>Status</th>
+                      <th class="text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody id="portfolio-table"></tbody>
@@ -148,6 +158,160 @@
         </div>
       </div>
     </main>
+    <!-- Add Company Modal -->
+    <div class="modal-overlay" id="add-company-modal">
+      <div class="modal" style="max-width: 600px;">
+        <div class="modal-header">
+          <h3 class="modal-title">Add New Company</h3>
+          <button class="modal-close" onclick="hideAddCompanyModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="add-company-form">
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label">Company Name *</label>
+                <input type="text" class="form-input" id="company-name" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Sector *</label>
+                <input type="text" class="form-input" id="company-sector" placeholder="e.g. FinTech, Healthcare" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Stage *</label>
+                <select class="form-input form-select" id="company-stage" required>
+                  <option value="Seed">Seed</option>
+                  <option value="Series A">Series A</option>
+                  <option value="Series B">Series B</option>
+                  <option value="Series C">Series C</option>
+                  <option value="Growth">Growth</option>
+                  <option value="Exited">Exited</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Status *</label>
+                <select class="form-input form-select" id="company-status" required>
+                  <option value="Active">Active</option>
+                  <option value="Exited">Exited</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Investment Date</label>
+                <input type="date" class="form-input" id="company-date">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Investment Amount ($)</label>
+                <input type="number" class="form-input" id="company-investment" placeholder="5000000">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Current Valuation ($)</label>
+                <input type="number" class="form-input" id="company-valuation" placeholder="25000000">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Ownership (%)</label>
+                <input type="number" step="0.1" class="form-input" id="company-ownership" placeholder="15.5">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Founder Name</label>
+                <input type="text" class="form-input" id="company-founder">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Founder Email</label>
+                <input type="email" class="form-input" id="company-founder-email">
+              </div>
+              <div class="form-group" style="grid-column: span 2;">
+                <label class="form-label">Location</label>
+                <input type="text" class="form-input" id="company-location" placeholder="San Francisco, CA">
+              </div>
+              <div class="form-group" style="grid-column: span 2;">
+                <label class="form-label">Description</label>
+                <input type="text" class="form-input" id="company-description" placeholder="Brief description of the company">
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="hideAddCompanyModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="addCompany()">Add Company</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Company Modal -->
+    <div class="modal-overlay" id="edit-company-modal">
+      <div class="modal" style="max-width: 600px;">
+        <div class="modal-header">
+          <h3 class="modal-title">Edit Company</h3>
+          <button class="modal-close" onclick="hideEditCompanyModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="edit-company-id">
+          <div class="grid-2">
+            <div class="form-group">
+              <label class="form-label">Company Name *</label>
+              <input type="text" class="form-input" id="edit-company-name" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Sector *</label>
+              <input type="text" class="form-input" id="edit-company-sector" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Stage *</label>
+              <select class="form-input form-select" id="edit-company-stage" required>
+                <option value="Seed">Seed</option>
+                <option value="Series A">Series A</option>
+                <option value="Series B">Series B</option>
+                <option value="Series C">Series C</option>
+                <option value="Growth">Growth</option>
+                <option value="Exited">Exited</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Status *</label>
+              <select class="form-input form-select" id="edit-company-status" required>
+                <option value="Active">Active</option>
+                <option value="Exited">Exited</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Investment Date</label>
+              <input type="date" class="form-input" id="edit-company-date">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Investment Amount ($)</label>
+              <input type="number" class="form-input" id="edit-company-investment">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Current Valuation ($)</label>
+              <input type="number" class="form-input" id="edit-company-valuation">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Ownership (%)</label>
+              <input type="number" step="0.1" class="form-input" id="edit-company-ownership">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Founder Name</label>
+              <input type="text" class="form-input" id="edit-company-founder">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Founder Email</label>
+              <input type="email" class="form-input" id="edit-company-founder-email">
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+              <label class="form-label">Location</label>
+              <input type="text" class="form-input" id="edit-company-location">
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+              <label class="form-label">Description</label>
+              <input type="text" class="form-input" id="edit-company-description">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="hideEditCompanyModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveCompanyEdit()">Save Changes</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Firebase SDK -->
@@ -192,6 +356,11 @@
       if (role === 'LP') {
         window.location.href = 'index.html';
         return;
+      }
+
+      // Only Admin and GP can add/edit companies
+      if (role !== 'Admin' && role !== 'GP') {
+        document.getElementById('add-company-btn').style.display = 'none';
       }
 
       // Load companies from Firebase
@@ -270,6 +439,8 @@
       // Sort by valuation
       companies.sort((a, b) => (b.currentValuation || 0) - (a.currentValuation || 0));
 
+      const canEdit = Auth.currentUserData?.role === 'Admin' || Auth.currentUserData?.role === 'GP';
+      
       const html = companies.map(c => `
         <tr>
           <td>
@@ -287,10 +458,16 @@
           <td class="text-right">${(c.ownership || 0).toFixed(1)}%</td>
           <td>${c.founder || '-'}</td>
           <td><span class="badge ${c.status === 'Active' ? 'badge-success' : 'badge-default'}">${c.status}</span></td>
+          <td class="text-right">
+            ${canEdit ? `
+              <button class="btn btn-ghost btn-sm" onclick="editCompany('${c.id}')">Edit</button>
+              <button class="btn btn-ghost btn-sm" style="color: var(--danger);" onclick="deleteCompany('${c.id}', '${c.name?.replace(/'/g, "\\'")}')">Delete</button>
+            ` : '-'}
+          </td>
         </tr>
       `).join('');
 
-      document.getElementById('portfolio-table').innerHTML = html || '<tr><td colspan="7" class="text-center text-muted" style="padding: 48px;">No companies found</td></tr>';
+      document.getElementById('portfolio-table').innerHTML = html || '<tr><td colspan="8" class="text-center text-muted" style="padding: 48px;">No companies found</td></tr>';
     }
 
     function setupFilters() {
@@ -357,6 +534,166 @@
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Portfolio');
       XLSX.writeFile(wb, 'idg-portfolio.xlsx');
+    }
+
+    // Toast notification
+    function showToast(message, isError = false) {
+      const existing = document.getElementById('toast');
+      if (existing) existing.remove();
+
+      const toast = document.createElement('div');
+      toast.id = 'toast';
+      toast.textContent = message;
+      toast.style.cssText = `
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        padding: 12px 24px;
+        background: ${isError ? '#EF4444' : '#10B981'};
+        color: white;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 9999;
+      `;
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // Add Company Modal
+    function showAddCompanyModal() {
+      document.getElementById('add-company-form').reset();
+      document.getElementById('add-company-modal').classList.add('visible');
+    }
+
+    function hideAddCompanyModal() {
+      document.getElementById('add-company-modal').classList.remove('visible');
+    }
+
+    async function addCompany() {
+      const name = document.getElementById('company-name').value;
+      const sector = document.getElementById('company-sector').value;
+      const stage = document.getElementById('company-stage').value;
+      const status = document.getElementById('company-status').value;
+
+      if (!name || !sector) {
+        showToast('Company name and sector are required', true);
+        return;
+      }
+
+      const companyData = {
+        name,
+        sector,
+        stage,
+        status,
+        investmentDate: document.getElementById('company-date').value || null,
+        investmentAmount: parseInt(document.getElementById('company-investment').value) || 0,
+        currentValuation: parseInt(document.getElementById('company-valuation').value) || 0,
+        ownership: parseFloat(document.getElementById('company-ownership').value) || 0,
+        founder: document.getElementById('company-founder').value || null,
+        founderEmail: document.getElementById('company-founder-email').value || null,
+        location: document.getElementById('company-location').value || null,
+        description: document.getElementById('company-description').value || null
+      };
+
+      const result = await Database.createCompany(companyData);
+      
+      if (result.success) {
+        hideAddCompanyModal();
+        companiesData = await Database.getCompanies();
+        renderSummary();
+        renderTable();
+        showToast('Company added successfully!');
+      } else {
+        showToast('Error adding company', true);
+      }
+    }
+
+    // Edit Company Modal
+    function editCompany(companyId) {
+      const company = companiesData.find(c => c.id === companyId);
+      if (!company) return;
+
+      document.getElementById('edit-company-id').value = companyId;
+      document.getElementById('edit-company-name').value = company.name || '';
+      document.getElementById('edit-company-sector').value = company.sector || '';
+      document.getElementById('edit-company-stage').value = company.stage || 'Seed';
+      document.getElementById('edit-company-status').value = company.status || 'Active';
+      document.getElementById('edit-company-date').value = company.investmentDate || '';
+      document.getElementById('edit-company-investment').value = company.investmentAmount || '';
+      document.getElementById('edit-company-valuation').value = company.currentValuation || '';
+      document.getElementById('edit-company-ownership').value = company.ownership || '';
+      document.getElementById('edit-company-founder').value = company.founder || '';
+      document.getElementById('edit-company-founder-email').value = company.founderEmail || '';
+      document.getElementById('edit-company-location').value = company.location || '';
+      document.getElementById('edit-company-description').value = company.description || '';
+
+      document.getElementById('edit-company-modal').classList.add('visible');
+    }
+
+    function hideEditCompanyModal() {
+      document.getElementById('edit-company-modal').classList.remove('visible');
+    }
+
+    async function saveCompanyEdit() {
+      const companyId = document.getElementById('edit-company-id').value;
+      const name = document.getElementById('edit-company-name').value;
+      const sector = document.getElementById('edit-company-sector').value;
+
+      if (!name || !sector) {
+        showToast('Company name and sector are required', true);
+        return;
+      }
+
+      const companyData = {
+        name,
+        sector,
+        stage: document.getElementById('edit-company-stage').value,
+        status: document.getElementById('edit-company-status').value,
+        investmentDate: document.getElementById('edit-company-date').value || null,
+        investmentAmount: parseInt(document.getElementById('edit-company-investment').value) || 0,
+        currentValuation: parseInt(document.getElementById('edit-company-valuation').value) || 0,
+        ownership: parseFloat(document.getElementById('edit-company-ownership').value) || 0,
+        founder: document.getElementById('edit-company-founder').value || null,
+        founderEmail: document.getElementById('edit-company-founder-email').value || null,
+        location: document.getElementById('edit-company-location').value || null,
+        description: document.getElementById('edit-company-description').value || null
+      };
+
+      const result = await Database.updateCompany(companyId, companyData);
+      
+      if (result.success) {
+        hideEditCompanyModal();
+        companiesData = await Database.getCompanies();
+        renderSummary();
+        renderTable();
+        showToast('Company updated successfully!');
+      } else {
+        showToast('Error updating company', true);
+      }
+    }
+
+    // Delete Company
+    async function deleteCompany(companyId, companyName) {
+      if (!confirm(`Are you sure you want to delete "${companyName}"? This cannot be undone.`)) {
+        return;
+      }
+
+      const result = await Database.deleteCompany(companyId);
+      
+      if (result.success) {
+        companiesData = await Database.getCompanies();
+        renderSummary();
+        renderTable();
+        showToast('Company deleted successfully');
+      } else {
+        showToast('Error deleting company', true);
+      }
     }
 
     init();
