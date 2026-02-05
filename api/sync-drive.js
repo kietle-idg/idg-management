@@ -50,9 +50,8 @@ async function listCompanyFolders(drive, folderId) {
 
 // List files in a folder (including subfolders recursively)
 async function listFilesInFolder(drive, folderId, depth = 0) {
-  if (depth > 2) return []; // Limit recursion depth
+  if (depth > 2) return [];
   
-  // Get all files and folders
   const response = await drive.files.list({
     q: `'${folderId}' in parents and trashed=false`,
     fields: 'files(id, name, mimeType, modifiedTime)',
@@ -64,20 +63,15 @@ async function listFilesInFolder(drive, folderId, depth = 0) {
   
   for (const item of items) {
     if (item.mimeType === 'application/vnd.google-apps.folder') {
-      // Recursively get files from subfolders
       const subFiles = await listFilesInFolder(drive, item.id, depth + 1);
       files = files.concat(subFiles);
     } else if (
-      item.mimeType === 'application/pdf' ||
-      item.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-      item.mimeType === 'application/vnd.ms-excel' ||
-      item.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-      item.mimeType === 'application/msword' ||
       item.mimeType === 'application/vnd.google-apps.spreadsheet' ||
       item.mimeType === 'application/vnd.google-apps.document' ||
       item.mimeType === 'text/plain' ||
       item.mimeType === 'text/csv'
     ) {
+      // Only process Google Docs, Sheets, and text files for now
       files.push(item);
     }
   }
@@ -91,73 +85,29 @@ async function getFileContent(drive, file) {
     let content = '';
     
     if (file.mimeType === 'application/vnd.google-apps.spreadsheet') {
-      // Export Google Sheets as CSV
       const response = await drive.files.export({
         fileId: file.id,
         mimeType: 'text/csv'
       }, { responseType: 'text' });
       content = response.data;
     } else if (file.mimeType === 'application/vnd.google-apps.document') {
-      // Export Google Docs as plain text
       const response = await drive.files.export({
         fileId: file.id,
         mimeType: 'text/plain'
       }, { responseType: 'text' });
       content = response.data;
     } else if (file.mimeType === 'text/plain' || file.mimeType === 'text/csv') {
-      // Download text files directly
       const response = await drive.files.get({
         fileId: file.id,
         alt: 'media'
       }, { responseType: 'text' });
       content = response.data;
-    } else if (file.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
-               file.mimeType === 'application/vnd.ms-excel') {
-      // Excel files - download and parse
-      const response = await drive.files.get({
-        fileId: file.id,
-        alt: 'media'
-      }, { responseType: 'arraybuffer' });
-      
-      const XLSX = require('xlsx');
-      const workbook = XLSX.read(response.data, { type: 'buffer' });
-      
-      // Get content from all sheets
-      for (const sheetName of workbook.SheetNames.slice(0, 3)) {
-        const sheet = workbook.Sheets[sheetName];
-        const csv = XLSX.utils.sheet_to_csv(sheet);
-        content += `\n[Sheet: ${sheetName}]\n${csv}`;
-      }
-    } else if (file.mimeType === 'application/pdf') {
-      // PDF files - download and parse
-      const response = await drive.files.get({
-        fileId: file.id,
-        alt: 'media'
-      }, { responseType: 'arraybuffer' });
-      
-      const pdfParse = require('pdf-parse');
-      const pdfData = await pdfParse(Buffer.from(response.data));
-      content = pdfData.text;
-    } else if (file.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-               file.mimeType === 'application/msword') {
-      // Word files - download and parse
-      const response = await drive.files.get({
-        fileId: file.id,
-        alt: 'media'
-      }, { responseType: 'arraybuffer' });
-      
-      const mammoth = require('mammoth');
-      const result = await mammoth.extractRawText({ buffer: Buffer.from(response.data) });
-      content = result.value;
-    } else {
-      content = `[File: ${file.name} - type: ${file.mimeType}]`;
     }
     
-    // Limit content length to avoid token limits
     return content.substring(0, 8000);
   } catch (error) {
     console.error(`Error reading file ${file.name}:`, error.message);
-    return `[File: ${file.name} - could not read: ${error.message}]`;
+    return `[Could not read: ${file.name}]`;
   }
 }
 
@@ -198,7 +148,6 @@ Return ONLY the JSON object, no other text.`;
     });
 
     const content = response.choices[0].message.content.trim();
-    // Parse the JSON from the response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);
@@ -211,7 +160,6 @@ Return ONLY the JSON object, no other text.`;
 }
 
 module.exports = async function handler(req, res) {
-  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -256,83 +204,89 @@ module.exports = async function handler(req, res) {
 
     for (const folder of companyFolders) {
       try {
-        // Get files in this company's folder
         const files = await listFilesInFolder(drive, folder.id);
         
         if (files.length === 0) {
           results.push({
             companyName: folder.name,
             status: 'no_files',
-            data: null
+            filesFound: 0,
+            filesProcessed: 0
           });
           continue;
         }
 
-        // Get content from each file
         let combinedContent = '';
-        for (const file of files.slice(0, 5)) { // Limit to 5 files per company
+        let processedCount = 0;
+        
+        for (const file of files.slice(0, 5)) {
           const content = await getFileContent(drive, file);
-          combinedContent += `\n\n--- ${file.name} ---\n${content}`;
+          if (content && !content.startsWith('[Could not read')) {
+            combinedContent += `\n\n--- ${file.name} ---\n${content}`;
+            processedCount++;
+          }
         }
 
-        // Extract data using AI
-        const extractedData = await extractPortfolioData(folder.name, combinedContent);
+        let extractedData = null;
+        let savedToFirebase = false;
         
-        // Save to Firebase if data was extracted
-        if (extractedData && db) {
-          const companyData = {
-            name: extractedData.name || folder.name,
-            sector: extractedData.sector || 'Other',
-            stage: extractedData.stage || 'Seed',
-            status: extractedData.status || 'Active',
-            investmentDate: extractedData.investmentDate || null,
-            investmentAmount: extractedData.investmentAmount || 0,
-            currentValuation: extractedData.currentValuation || 0,
-            ownership: extractedData.ownership || 0,
-            founder: extractedData.founder || null,
-            founderEmail: extractedData.founderEmail || null,
-            location: extractedData.location || null,
-            description: extractedData.description || null,
-            lastUpdate: extractedData.lastUpdate || null,
-            driveFolderId: folder.id,
-            syncedAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
-          };
+        if (combinedContent.length > 50) {
+          extractedData = await extractPortfolioData(folder.name, combinedContent);
           
-          // Check if company already exists (by driveFolderId or name)
-          const existing = await db.collection('companies')
-            .where('driveFolderId', '==', folder.id)
-            .limit(1)
-            .get();
-          
-          if (!existing.empty) {
-            // Update existing company
-            await existing.docs[0].ref.update(companyData);
-          } else {
-            // Check by name
-            const byName = await db.collection('companies')
-              .where('name', '==', companyData.name)
+          // Save to Firebase if data was extracted
+          if (extractedData && db) {
+            const companyData = {
+              name: extractedData.name || folder.name,
+              sector: extractedData.sector || 'Other',
+              stage: extractedData.stage || 'Seed',
+              status: extractedData.status || 'Active',
+              investmentDate: extractedData.investmentDate || null,
+              investmentAmount: extractedData.investmentAmount || 0,
+              currentValuation: extractedData.currentValuation || 0,
+              ownership: extractedData.ownership || 0,
+              founder: extractedData.founder || null,
+              founderEmail: extractedData.founderEmail || null,
+              location: extractedData.location || null,
+              description: extractedData.description || null,
+              lastUpdate: extractedData.lastUpdate || null,
+              driveFolderId: folder.id,
+              syncedAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            };
+            
+            // Check if company already exists
+            const existing = await db.collection('companies')
+              .where('driveFolderId', '==', folder.id)
               .limit(1)
               .get();
             
-            if (!byName.empty) {
-              await byName.docs[0].ref.update(companyData);
+            if (!existing.empty) {
+              await existing.docs[0].ref.update(companyData);
+              savedToFirebase = true;
             } else {
-              // Create new company
-              companyData.createdAt = admin.firestore.FieldValue.serverTimestamp();
-              await db.collection('companies').add(companyData);
+              const byName = await db.collection('companies')
+                .where('name', '==', companyData.name)
+                .limit(1)
+                .get();
+              
+              if (!byName.empty) {
+                await byName.docs[0].ref.update(companyData);
+                savedToFirebase = true;
+              } else {
+                companyData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+                await db.collection('companies').add(companyData);
+                savedToFirebase = true;
+              }
             }
           }
         }
         
         results.push({
           companyName: folder.name,
-          folderId: folder.id,
-          filesProcessed: Math.min(files.length, 5),
-          totalFiles: files.length,
-          status: extractedData ? 'success' : 'no_data_extracted',
-          data: extractedData,
-          savedToFirebase: extractedData && db ? true : false
+          filesFound: files.length,
+          filesProcessed: processedCount,
+          status: savedToFirebase ? 'success' : (extractedData ? 'extracted_not_saved' : 'no_data_extracted'),
+          savedToFirebase
         });
 
       } catch (error) {
@@ -347,6 +301,7 @@ module.exports = async function handler(req, res) {
       success: true,
       timestamp: new Date().toISOString(),
       foldersProcessed: companyFolders.length,
+      firebaseConnected: db !== null,
       results,
       errors
     });
@@ -355,7 +310,8 @@ module.exports = async function handler(req, res) {
     console.error('Sync error:', error);
     return res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
+      stack: error.stack
     });
   }
 };
