@@ -188,59 +188,67 @@
       localStorage.removeItem('googleCalendarToken');
     }
 
-    // Connect to Google Calendar using Google Identity Services
+    // Google Calendar token client (initialized once)
+    let calendarTokenClient = null;
+    
+    // Initialize the token client on page load
+    function initCalendarClient() {
+      if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+        calendarTokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: '728812948064-2kdc14o4emgtn9ak4tioqme5d62ev6sa.apps.googleusercontent.com',
+          scope: 'https://www.googleapis.com/auth/calendar.readonly',
+          callback: handleCalendarCallback
+        });
+        console.log('Calendar token client initialized');
+      } else {
+        console.log('Google Identity Services not ready, retrying...');
+        setTimeout(initCalendarClient, 500);
+      }
+    }
+    
+    // Handle the OAuth callback
+    async function handleCalendarCallback(response) {
+      console.log('Calendar callback received:', response);
+      
+      if (response.error) {
+        document.getElementById('calendar-loading').style.display = 'none';
+        document.getElementById('calendar-connect').style.display = 'block';
+        showToast('Calendar access denied: ' + response.error, true);
+        return;
+      }
+      
+      if (response.access_token) {
+        showToast('Calendar connected!');
+        storeCalendarToken(response.access_token);
+        await fetchCalendarEvents(response.access_token);
+      } else {
+        document.getElementById('calendar-loading').style.display = 'none';
+        document.getElementById('calendar-connect').style.display = 'block';
+        showToast('Could not get calendar access', true);
+      }
+    }
+
+    // Connect to Google Calendar
     function connectGoogleCalendar() {
-      console.log('Starting calendar connection...');
+      console.log('Connect calendar clicked');
       document.getElementById('calendar-loading').style.display = 'block';
       document.getElementById('calendar-connect').style.display = 'none';
       document.getElementById('events-list').innerHTML = '';
       
-      // Check if Google Identity Services loaded
-      if (typeof google === 'undefined' || !google.accounts) {
-        console.error('Google Identity Services not loaded');
+      if (!calendarTokenClient) {
+        showToast('Please wait, loading Google services...', true);
         document.getElementById('calendar-loading').style.display = 'none';
         document.getElementById('calendar-connect').style.display = 'block';
-        showToast('Google services not loaded. Please refresh the page.', true);
+        initCalendarClient();
         return;
       }
       
-      try {
-        console.log('Initializing token client...');
-        const client = google.accounts.oauth2.initTokenClient({
-          client_id: '728812948064-2kdc14o4emgtn9ak4tioqme5d62ev6sa.apps.googleusercontent.com',
-          scope: 'https://www.googleapis.com/auth/calendar.readonly',
-          callback: async (response) => {
-            alert('Callback received! Token: ' + (response.access_token ? 'YES' : 'NO') + ', Error: ' + (response.error || 'none'));
-            console.log('OAuth callback received:', response);
-            if (response.error) {
-              console.error('OAuth error in callback:', response.error);
-              document.getElementById('calendar-loading').style.display = 'none';
-              document.getElementById('calendar-connect').style.display = 'block';
-              showToast('Calendar error: ' + response.error, true);
-              return;
-            }
-            if (response.access_token) {
-              console.log('Got access token, fetching events...');
-              storeCalendarToken(response.access_token);
-              await fetchCalendarEvents(response.access_token);
-            } else {
-              console.error('No access token in response');
-              document.getElementById('calendar-loading').style.display = 'none';
-              document.getElementById('calendar-connect').style.display = 'block';
-              showToast('Could not get calendar access', true);
-            }
-          }
-        });
-        
-        console.log('Requesting access token...');
-        client.requestAccessToken();
-      } catch (error) {
-        console.error('Calendar connection error:', error);
-        document.getElementById('calendar-loading').style.display = 'none';
-        document.getElementById('calendar-connect').style.display = 'block';
-        showToast('Error: ' + error.message, true);
-      }
+      // Request access token - this opens the Google popup
+      calendarTokenClient.requestAccessToken({ prompt: '' });
     }
+    
+    // Initialize on page load
+    setTimeout(initCalendarClient, 1000);
 
     // Fetch events from Google Calendar
     async function fetchCalendarEvents(token) {
