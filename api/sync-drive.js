@@ -1,5 +1,19 @@
 const { google } = require('googleapis');
 const OpenAI = require('openai');
+const admin = require('firebase-admin');
+
+// Initialize Firebase Admin (only once)
+if (!admin.apps.length) {
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
+  if (serviceAccount.project_id) {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+  }
+}
+
+// Get Firestore reference
+const db = admin.apps.length ? admin.firestore() : null;
 
 // Initialize OpenAI
 const openai = new OpenAI({
@@ -26,25 +40,44 @@ async function listCompanyFolders(drive, folderId) {
   return response.data.files || [];
 }
 
-// List files in a folder
-async function listFilesInFolder(drive, folderId) {
+// List files in a folder (including subfolders recursively)
+async function listFilesInFolder(drive, folderId, depth = 0) {
+  if (depth > 2) return []; // Limit recursion depth
+  
+  // Get all files and folders
   const response = await drive.files.list({
-    q: `'${folderId}' in parents and trashed=false and (
-      mimeType='application/pdf' or 
-      mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or
-      mimeType='application/vnd.ms-excel' or
-      mimeType='application/vnd.openxmlformats-officedocument.wordprocessingml.document' or
-      mimeType='application/msword' or
-      mimeType='application/vnd.google-apps.spreadsheet' or
-      mimeType='application/vnd.google-apps.document'
-    )`,
+    q: `'${folderId}' in parents and trashed=false`,
     fields: 'files(id, name, mimeType, modifiedTime)',
-    pageSize: 50
+    pageSize: 100
   });
-  return response.data.files || [];
+  
+  const items = response.data.files || [];
+  let files = [];
+  
+  for (const item of items) {
+    if (item.mimeType === 'application/vnd.google-apps.folder') {
+      // Recursively get files from subfolders
+      const subFiles = await listFilesInFolder(drive, item.id, depth + 1);
+      files = files.concat(subFiles);
+    } else if (
+      item.mimeType === 'application/pdf' ||
+      item.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      item.mimeType === 'application/vnd.ms-excel' ||
+      item.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      item.mimeType === 'application/msword' ||
+      item.mimeType === 'application/vnd.google-apps.spreadsheet' ||
+      item.mimeType === 'application/vnd.google-apps.document' ||
+      item.mimeType === 'text/plain' ||
+      item.mimeType === 'text/csv'
+    ) {
+      files.push(item);
+    }
+  }
+  
+  return files;
 }
 
-// Download file content as text (for Google Docs/Sheets)
+// Download file content as text
 async function getFileContent(drive, file) {
   try {
     let content = '';
@@ -63,16 +96,60 @@ async function getFileContent(drive, file) {
         mimeType: 'text/plain'
       }, { responseType: 'text' });
       content = response.data;
+    } else if (file.mimeType === 'text/plain' || file.mimeType === 'text/csv') {
+      // Download text files directly
+      const response = await drive.files.get({
+        fileId: file.id,
+        alt: 'media'
+      }, { responseType: 'text' });
+      content = response.data;
+    } else if (file.mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+               file.mimeType === 'application/vnd.ms-excel') {
+      // Excel files - download and parse
+      const response = await drive.files.get({
+        fileId: file.id,
+        alt: 'media'
+      }, { responseType: 'arraybuffer' });
+      
+      const XLSX = require('xlsx');
+      const workbook = XLSX.read(response.data, { type: 'buffer' });
+      
+      // Get content from all sheets
+      for (const sheetName of workbook.SheetNames.slice(0, 3)) {
+        const sheet = workbook.Sheets[sheetName];
+        const csv = XLSX.utils.sheet_to_csv(sheet);
+        content += `\n[Sheet: ${sheetName}]\n${csv}`;
+      }
+    } else if (file.mimeType === 'application/pdf') {
+      // PDF files - download and parse
+      const response = await drive.files.get({
+        fileId: file.id,
+        alt: 'media'
+      }, { responseType: 'arraybuffer' });
+      
+      const pdfParse = require('pdf-parse');
+      const pdfData = await pdfParse(Buffer.from(response.data));
+      content = pdfData.text;
+    } else if (file.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+               file.mimeType === 'application/msword') {
+      // Word files - download and parse
+      const response = await drive.files.get({
+        fileId: file.id,
+        alt: 'media'
+      }, { responseType: 'arraybuffer' });
+      
+      const mammoth = require('mammoth');
+      const result = await mammoth.extractRawText({ buffer: Buffer.from(response.data) });
+      content = result.value;
     } else {
-      // For other files, just note the file name for now
-      // (Full binary parsing would require more complex handling)
-      content = `[File: ${file.name}]`;
+      content = `[File: ${file.name} - type: ${file.mimeType}]`;
     }
     
-    return content.substring(0, 5000); // Limit content length
+    // Limit content length to avoid token limits
+    return content.substring(0, 8000);
   } catch (error) {
     console.error(`Error reading file ${file.name}:`, error.message);
-    return `[Could not read: ${file.name}]`;
+    return `[File: ${file.name} - could not read: ${error.message}]`;
   }
 }
 
@@ -175,13 +252,61 @@ module.exports = async function handler(req, res) {
         // Extract data using AI
         const extractedData = await extractPortfolioData(folder.name, combinedContent);
         
+        // Save to Firebase if data was extracted
+        if (extractedData && db) {
+          const companyData = {
+            name: extractedData.name || folder.name,
+            sector: extractedData.sector || 'Other',
+            stage: extractedData.stage || 'Seed',
+            status: extractedData.status || 'Active',
+            investmentDate: extractedData.investmentDate || null,
+            investmentAmount: extractedData.investmentAmount || 0,
+            currentValuation: extractedData.currentValuation || 0,
+            ownership: extractedData.ownership || 0,
+            founder: extractedData.founder || null,
+            founderEmail: extractedData.founderEmail || null,
+            location: extractedData.location || null,
+            description: extractedData.description || null,
+            lastUpdate: extractedData.lastUpdate || null,
+            driveFolderId: folder.id,
+            syncedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          };
+          
+          // Check if company already exists (by driveFolderId or name)
+          const existing = await db.collection('companies')
+            .where('driveFolderId', '==', folder.id)
+            .limit(1)
+            .get();
+          
+          if (!existing.empty) {
+            // Update existing company
+            await existing.docs[0].ref.update(companyData);
+          } else {
+            // Check by name
+            const byName = await db.collection('companies')
+              .where('name', '==', companyData.name)
+              .limit(1)
+              .get();
+            
+            if (!byName.empty) {
+              await byName.docs[0].ref.update(companyData);
+            } else {
+              // Create new company
+              companyData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+              await db.collection('companies').add(companyData);
+            }
+          }
+        }
+        
         results.push({
           companyName: folder.name,
           folderId: folder.id,
           filesProcessed: Math.min(files.length, 5),
           totalFiles: files.length,
           status: extractedData ? 'success' : 'no_data_extracted',
-          data: extractedData
+          data: extractedData,
+          savedToFirebase: extractedData && db ? true : false
         });
 
       } catch (error) {
