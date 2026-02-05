@@ -197,7 +197,13 @@ module.exports = async function handler(req, res) {
     const drive = google.drive({ version: 'v3', auth });
 
     // Get all company folders
-    const companyFolders = await listCompanyFolders(drive, folderId);
+    const allFolders = await listCompanyFolders(drive, folderId);
+    
+    // Get offset from query params (for pagination)
+    const offset = parseInt(req.query?.offset) || 0;
+    const limit = parseInt(req.query?.limit) || 5; // Process 5 at a time
+    
+    const companyFolders = allFolders.slice(offset, offset + limit);
     
     const results = [];
     const errors = [];
@@ -300,7 +306,12 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({
       success: true,
       timestamp: new Date().toISOString(),
+      totalFolders: allFolders.length,
       foldersProcessed: companyFolders.length,
+      offset,
+      limit,
+      hasMore: offset + limit < allFolders.length,
+      nextOffset: offset + limit < allFolders.length ? offset + limit : null,
       firebaseConnected: db !== null,
       results,
       errors

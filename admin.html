@@ -577,7 +577,7 @@
       document.getElementById('edit-commitment-group').style.display = e.target.value === 'LP' ? 'block' : 'none';
     });
 
-    // Google Drive Sync
+    // Google Drive Sync - with batching to avoid timeout
     async function syncFromDrive() {
       const btn = document.getElementById('sync-btn');
       const statusEl = document.getElementById('sync-status');
@@ -592,32 +592,49 @@
       statusEl.style.display = 'block';
       resultsEl.style.display = 'none';
       errorEl.style.display = 'none';
-      statusText.textContent = 'Connecting to Google Drive...';
+      
+      const allResults = [];
+      const allErrors = [];
+      let offset = 0;
+      let totalFolders = 0;
+      let hasMore = true;
 
       try {
-        const response = await fetch('/api/sync-drive', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        });
+        // Sync in batches of 5 folders
+        while (hasMore) {
+          statusText.textContent = `Syncing folders ${offset + 1} to ${offset + 5}...`;
 
-        const data = await response.json();
+          const response = await fetch(`/api/sync-drive?offset=${offset}&limit=5`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
 
-        if (!data.success) {
-          throw new Error(data.error || 'Sync failed');
+          const data = await response.json();
+
+          if (!data.success) {
+            throw new Error(data.error || 'Sync failed');
+          }
+
+          totalFolders = data.totalFolders || totalFolders;
+          hasMore = data.hasMore;
+          offset = data.nextOffset || offset + 5;
+
+          if (data.results) allResults.push(...data.results);
+          if (data.errors) allErrors.push(...data.errors);
+
+          statusText.textContent = `Processed ${Math.min(offset, totalFolders)} of ${totalFolders} folders...`;
         }
-
-        statusText.textContent = 'Processing results...';
 
         // Show results
         let resultsHtml = `
           <div style="margin-bottom: 16px; padding: 12px; background: #D1FAE5; color: #065F46; border-radius: 8px;">
-            ✓ Synced ${data.foldersProcessed} company folders at ${new Date(data.timestamp).toLocaleString()}
+            ✓ Synced ${totalFolders} company folders at ${new Date().toLocaleString()}
           </div>
         `;
 
-        if (data.results && data.results.length > 0) {
+        if (allResults.length > 0) {
           resultsHtml += '<div style="max-height: 300px; overflow-y: auto;">';
-          for (const result of data.results) {
+          for (const result of allResults) {
             const statusIcon = result.status === 'success' ? '✓' : result.status === 'no_files' ? '📁' : '⚠️';
             const statusColor = result.status === 'success' ? '#065F46' : '#92400E';
             resultsHtml += `
@@ -625,26 +642,20 @@
                 <div>
                   <strong>${result.companyName}</strong>
                   <div style="font-size: 13px; color: var(--text-muted);">
-                    ${result.totalFiles || 0} files found, ${result.filesProcessed || 0} processed
+                    ${result.filesFound || 0} files found, ${result.filesProcessed || 0} processed
                   </div>
                 </div>
                 <span style="color: ${statusColor};">${statusIcon} ${result.status}</span>
               </div>
             `;
-
-            // If data was extracted successfully, offer to update Firebase
-            if (result.data && result.status === 'success') {
-              // Auto-update or show preview
-              await updateCompanyFromSync(result.companyName, result.data);
-            }
           }
           resultsHtml += '</div>';
         }
 
-        if (data.errors && data.errors.length > 0) {
+        if (allErrors.length > 0) {
           resultsHtml += '<div style="margin-top: 16px; color: #DC2626;">';
           resultsHtml += '<strong>Errors:</strong><ul>';
-          for (const err of data.errors) {
+          for (const err of allErrors) {
             resultsHtml += `<li>${err.companyName}: ${err.error}</li>`;
           }
           resultsHtml += '</ul></div>';
@@ -654,7 +665,8 @@
         statusEl.style.display = 'none';
         resultsEl.style.display = 'block';
 
-        showToast(`Synced ${data.foldersProcessed} company folders!`);
+        const successCount = allResults.filter(r => r.savedToFirebase).length;
+        showToast(`Synced ${totalFolders} folders, ${successCount} companies updated!`);
 
       } catch (error) {
         console.error('Sync error:', error);
