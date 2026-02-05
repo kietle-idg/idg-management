@@ -339,6 +339,9 @@
         document.getElementById('fund-moic').value = fund.moic || '';
       }
 
+      // Load last sync results
+      await loadLastSyncResults();
+
       // Setup filters
       setupFilters();
 
@@ -577,6 +580,91 @@
       document.getElementById('edit-commitment-group').style.display = e.target.value === 'LP' ? 'block' : 'none';
     });
 
+    // Load last sync results from Firebase
+    async function loadLastSyncResults() {
+      try {
+        const doc = await firebaseDb.collection('settings').doc('lastSync').get();
+        if (doc.exists) {
+          const data = doc.data();
+          displaySyncResults(data.results || [], data.errors || [], data.totalFolders || 0, data.timestamp);
+        }
+      } catch (error) {
+        console.log('No previous sync results found');
+      }
+    }
+
+    // Save sync results to Firebase
+    async function saveSyncResults(results, errors, totalFolders) {
+      try {
+        await firebaseDb.collection('settings').doc('lastSync').set({
+          results,
+          errors,
+          totalFolders,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Error saving sync results:', error);
+      }
+    }
+
+    // Display sync results
+    function displaySyncResults(results, errors, totalFolders, timestamp) {
+      const resultsEl = document.getElementById('sync-results');
+      const resultsContent = document.getElementById('sync-results-content');
+
+      let resultsHtml = `
+        <div style="margin-bottom: 16px; padding: 12px; background: #D1FAE5; color: #065F46; border-radius: 8px;">
+          ✓ Last sync: ${totalFolders} company folders at ${new Date(timestamp).toLocaleString()}
+        </div>
+      `;
+
+      if (results.length > 0) {
+        const successCount = results.filter(r => r.savedToFirebase || r.status === 'success').length;
+        const noFilesCount = results.filter(r => r.status === 'no_files').length;
+        
+        resultsHtml += `
+          <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+            <div style="padding: 8px 16px; background: var(--bg-secondary); border-radius: 6px;">
+              <strong style="color: #065F46;">${successCount}</strong> synced
+            </div>
+            <div style="padding: 8px 16px; background: var(--bg-secondary); border-radius: 6px;">
+              <strong style="color: #92400E;">${noFilesCount}</strong> no files
+            </div>
+          </div>
+        `;
+        
+        resultsHtml += '<div style="max-height: 300px; overflow-y: auto;">';
+        for (const result of results) {
+          const statusIcon = result.status === 'success' || result.savedToFirebase ? '✓' : result.status === 'no_files' ? '📁' : '⚠️';
+          const statusColor = result.status === 'success' || result.savedToFirebase ? '#065F46' : '#92400E';
+          resultsHtml += `
+            <div style="padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong>${result.companyName}</strong>
+                <div style="font-size: 13px; color: var(--text-muted);">
+                  ${result.filesFound || 0} files found, ${result.filesProcessed || 0} processed
+                </div>
+              </div>
+              <span style="color: ${statusColor};">${statusIcon} ${result.status}</span>
+            </div>
+          `;
+        }
+        resultsHtml += '</div>';
+      }
+
+      if (errors.length > 0) {
+        resultsHtml += '<div style="margin-top: 16px; color: #DC2626;">';
+        resultsHtml += '<strong>Errors:</strong><ul>';
+        for (const err of errors) {
+          resultsHtml += `<li>${err.companyName}: ${err.error}</li>`;
+        }
+        resultsHtml += '</ul></div>';
+      }
+
+      resultsContent.innerHTML = resultsHtml;
+      resultsEl.style.display = 'block';
+    }
+
     // Google Drive Sync - with batching to avoid timeout
     async function syncFromDrive() {
       const btn = document.getElementById('sync-btn');
@@ -625,45 +713,12 @@
           statusText.textContent = `Processed ${Math.min(offset, totalFolders)} of ${totalFolders} folders...`;
         }
 
-        // Show results
-        let resultsHtml = `
-          <div style="margin-bottom: 16px; padding: 12px; background: #D1FAE5; color: #065F46; border-radius: 8px;">
-            ✓ Synced ${totalFolders} company folders at ${new Date().toLocaleString()}
-          </div>
-        `;
-
-        if (allResults.length > 0) {
-          resultsHtml += '<div style="max-height: 300px; overflow-y: auto;">';
-          for (const result of allResults) {
-            const statusIcon = result.status === 'success' ? '✓' : result.status === 'no_files' ? '📁' : '⚠️';
-            const statusColor = result.status === 'success' ? '#065F46' : '#92400E';
-            resultsHtml += `
-              <div style="padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                  <strong>${result.companyName}</strong>
-                  <div style="font-size: 13px; color: var(--text-muted);">
-                    ${result.filesFound || 0} files found, ${result.filesProcessed || 0} processed
-                  </div>
-                </div>
-                <span style="color: ${statusColor};">${statusIcon} ${result.status}</span>
-              </div>
-            `;
-          }
-          resultsHtml += '</div>';
-        }
-
-        if (allErrors.length > 0) {
-          resultsHtml += '<div style="margin-top: 16px; color: #DC2626;">';
-          resultsHtml += '<strong>Errors:</strong><ul>';
-          for (const err of allErrors) {
-            resultsHtml += `<li>${err.companyName}: ${err.error}</li>`;
-          }
-          resultsHtml += '</ul></div>';
-        }
-
-        resultsContent.innerHTML = resultsHtml;
+        // Save results to Firebase
+        await saveSyncResults(allResults, allErrors, totalFolders);
+        
+        // Display results
         statusEl.style.display = 'none';
-        resultsEl.style.display = 'block';
+        displaySyncResults(allResults, allErrors, totalFolders, new Date().toISOString());
 
         const successCount = allResults.filter(r => r.savedToFirebase).length;
         showToast(`Synced ${totalFolders} folders, ${successCount} companies updated!`);
