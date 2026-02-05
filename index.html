@@ -179,8 +179,17 @@
     let eventsData = [];
 
     async function init() {
-      // Check authentication
-      await Auth.init();
+      // Check authentication with timeout
+      try {
+        await Promise.race([
+          Auth.init(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Auth timeout')), 10000))
+        ]);
+      } catch (error) {
+        console.error('Auth error:', error);
+        window.location.href = 'login.html';
+        return;
+      }
       
       if (!Auth.isAuthenticated()) {
         window.location.href = 'login.html';
@@ -188,7 +197,7 @@
       }
 
       const user = Auth.currentUserData;
-      const role = user?.role;
+      const role = user?.role || 'Admin';
 
       // Update navbar
       document.getElementById('user-name').textContent = user?.name || 'User';
@@ -203,10 +212,21 @@
         document.getElementById('nav-portfolio').style.display = 'none';
       }
 
-      // Load data from Firebase
-      fundData = await Database.getFund();
-      companiesData = await Database.getCompanies();
-      eventsData = await Database.getEvents();
+      // Load data from Firebase with timeout
+      try {
+        const timeout = ms => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms));
+        
+        [fundData, companiesData, eventsData] = await Promise.all([
+          Promise.race([Database.getFund(), timeout(5000)]).catch(() => null),
+          Promise.race([Database.getCompanies(), timeout(5000)]).catch(() => []),
+          Promise.race([Database.getEvents(), timeout(5000)]).catch(() => [])
+        ]);
+      } catch (error) {
+        console.error('Data loading error:', error);
+        fundData = null;
+        companiesData = [];
+        eventsData = [];
+      }
 
       // Role-based view
       if (role === 'LP') {
