@@ -593,6 +593,64 @@
       }
     }
 
+    // Save a company to Firebase
+    async function saveCompanyToFirebase(company) {
+      try {
+        // Check if company already exists by driveFolderId
+        const existing = await firebaseDb.collection('companies')
+          .where('driveFolderId', '==', company.driveFolderId)
+          .limit(1)
+          .get();
+        
+        if (!existing.empty) {
+          // Update only sync-related fields, preserve user-edited data
+          await existing.docs[0].ref.update({
+            driveFileCount: company.driveFileCount,
+            syncedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          return true;
+        }
+        
+        // Check by name
+        const byName = await firebaseDb.collection('companies')
+          .where('name', '==', company.name)
+          .limit(1)
+          .get();
+        
+        if (!byName.empty) {
+          await byName.docs[0].ref.update({
+            driveFolderId: company.driveFolderId,
+            driveFileCount: company.driveFileCount,
+            syncedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          return true;
+        }
+        
+        // Create new company
+        await firebaseDb.collection('companies').add({
+          name: company.name,
+          displayName: company.displayName,
+          driveFolderId: company.driveFolderId,
+          driveFileCount: company.driveFileCount,
+          status: 'Active',
+          sector: null,
+          stage: null,
+          investmentAmount: null,
+          currentValuation: null,
+          ownership: null,
+          founder: null,
+          location: null,
+          description: null,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          syncedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        return true;
+      } catch (error) {
+        console.error('Error saving company:', company.name, error);
+        return false;
+      }
+    }
+
     // Save sync results to Firebase
     async function saveSyncResults(results, errors, totalFolders) {
       try {
@@ -689,11 +747,11 @@
       let hasMore = true;
 
       try {
-        // Sync in batches of 5 folders
+        // Sync in batches of 10 folders
         while (hasMore) {
-          statusText.textContent = `Syncing folders ${offset + 1} to ${offset + 5}...`;
+          statusText.textContent = `Reading folders ${offset + 1} to ${offset + 10}...`;
 
-          const response = await fetch(`/api/sync-drive?offset=${offset}&limit=5`, {
+          const response = await fetch(`/api/sync-drive?offset=${offset}&limit=10`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
           });
@@ -706,15 +764,31 @@
 
           totalFolders = data.totalFolders || totalFolders;
           hasMore = data.hasMore;
-          offset = data.nextOffset || offset + 5;
+          offset = data.nextOffset || offset + 10;
 
-          if (data.results) allResults.push(...data.results);
-          if (data.errors) allErrors.push(...data.errors);
+          // Save each company to Firebase
+          if (data.companies) {
+            for (const company of data.companies) {
+              if (!company.error) {
+                const saved = await saveCompanyToFirebase(company);
+                allResults.push({
+                  companyName: company.name,
+                  filesFound: company.driveFileCount,
+                  savedToFirebase: saved
+                });
+              } else {
+                allErrors.push({
+                  companyName: company.name,
+                  error: company.error
+                });
+              }
+            }
+          }
 
-          statusText.textContent = `Processed ${Math.min(offset, totalFolders)} of ${totalFolders} folders...`;
+          statusText.textContent = `Saved ${Math.min(offset, totalFolders)} of ${totalFolders} companies...`;
         }
 
-        // Save results to Firebase
+        // Save sync results summary
         await saveSyncResults(allResults, allErrors, totalFolders);
         
         // Display results
@@ -722,7 +796,7 @@
         displaySyncResults(allResults, allErrors, totalFolders, new Date().toISOString());
 
         const successCount = allResults.filter(r => r.savedToFirebase).length;
-        showToast(`Synced ${totalFolders} folders, ${successCount} companies updated!`);
+        showToast(`Synced ${totalFolders} folders, ${successCount} companies saved!`);
 
       } catch (error) {
         console.error('Sync error:', error);

@@ -6,8 +6,6 @@
     "dev": "python3 -m http.server 8080"
   },
   "dependencies": {
-    "firebase-admin": "^11.11.0",
-    "googleapis": "^137.0.0",
-    "openai": "^4.47.1"
+    "googleapis": "^137.0.0"
   }
 }
