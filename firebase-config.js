@@ -24,7 +24,16 @@ firebase.initializeApp(firebaseConfig);
 // Initialize services
 const auth = firebase.auth();
 const db = firebase.firestore();
-const storage = firebase.storage();
+
+// Storage is optional (not all pages need it)
+let storage = null;
+try {
+  if (firebase.storage) {
+    storage = firebase.storage();
+  }
+} catch (e) {
+  console.log('Storage not available on this page');
+}
 
 // Auth state persistence
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);

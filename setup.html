@@ -21,11 +21,11 @@
       <div id="status-message" class="login-error"></div>
 
       <div id="step-1">
-        <h3 style="margin-bottom: 16px;">Step 1: Create Admin Account</h3>
+        <h3 style="margin-bottom: 16px;">Step 1: Sign In or Create Account</h3>
         <form id="admin-form">
           <div class="form-group">
             <label class="form-label" for="admin-name">Full Name</label>
-            <input type="text" id="admin-name" class="form-input" placeholder="Katherine Le" required>
+            <input type="text" id="admin-name" class="form-input" placeholder="Katherine Le">
           </div>
           <div class="form-group">
             <label class="form-label" for="admin-email">Email</label>
@@ -33,9 +33,9 @@
           </div>
           <div class="form-group">
             <label class="form-label" for="admin-password">Password</label>
-            <input type="password" id="admin-password" class="form-input" placeholder="Min 6 characters" required minlength="6">
+            <input type="password" id="admin-password" class="form-input" placeholder="Your password" required minlength="6">
           </div>
-          <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">Create Admin Account</button>
+          <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">Sign In / Create Account</button>
         </form>
       </div>
 
@@ -130,7 +130,7 @@
       document.getElementById('loading').classList.add('hidden');
     }
 
-    // Step 1: Create admin account
+    // Step 1: Sign in or create admin account
     document.getElementById('admin-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       
@@ -139,32 +139,46 @@
       const password = document.getElementById('admin-password').value;
       
       document.getElementById('step-1').classList.add('hidden');
-      showLoading('Creating admin account...');
+      showLoading('Signing in...');
       
       try {
-        // Create Firebase auth user
-        const result = await firebase.auth().createUserWithEmailAndPassword(email, password);
-        adminUserId = result.user.uid;
+        let result;
         
-        // Create user document with Admin role
-        await firebase.firestore().collection('users').doc(adminUserId).set({
-          email: email,
-          name: name,
-          role: 'Admin',
-          title: 'Managing Partner',
-          assignedCompanies: [],
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-          lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        // Try to sign in first
+        try {
+          result = await firebase.auth().signInWithEmailAndPassword(email, password);
+          adminUserId = result.user.uid;
+          showMessage('Signed in successfully!', false);
+        } catch (signInError) {
+          // If sign in fails, try to create account
+          if (signInError.code === 'auth/user-not-found') {
+            showLoading('Creating admin account...');
+            result = await firebase.auth().createUserWithEmailAndPassword(email, password);
+            adminUserId = result.user.uid;
+            
+            // Create user document with Admin role
+            await firebase.firestore().collection('users').doc(adminUserId).set({
+              email: email,
+              name: name || 'Admin',
+              role: 'Admin',
+              title: 'Managing Partner',
+              assignedCompanies: [],
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            showMessage('Admin account created successfully!', false);
+          } else {
+            throw signInError;
+          }
+        }
         
         hideLoading();
         document.getElementById('step-2').classList.remove('hidden');
-        showMessage('Admin account created successfully!', false);
         
       } catch (error) {
         hideLoading();
         document.getElementById('step-1').classList.remove('hidden');
-        showMessage(error.message);
+        showMessage('Firebase: ' + error.message);
       }
     });
 
