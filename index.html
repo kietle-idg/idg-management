@@ -298,19 +298,41 @@
     }
 
     function renderMetrics() {
-      document.getElementById('metric-aum').textContent = formatCurrency(fundData?.aum);
-      document.getElementById('metric-irr').textContent = formatPercent(fundData?.irr);
-      document.getElementById('metric-moic').textContent = (fundData?.moic || 0).toFixed(2) + 'x';
-      document.getElementById('metric-companies').textContent = fundData?.portfolioCount || companiesData.length;
+      // Calculate AUM from portfolio (sum of our share of each company's valuation)
+      const aum = companiesData.reduce((sum, c) => {
+        const ourValue = (c.currentValuation || 0) * (c.ownership || 0) / 100;
+        return sum + ourValue;
+      }, 0);
+      
+      // Calculate total invested
+      const totalInvested = companiesData.reduce((sum, c) => sum + (c.investmentAmount || 0), 0);
+      
+      // Calculate MOIC (Multiple on Invested Capital)
+      const moic = totalInvested > 0 ? aum / totalInvested : 0;
+      
+      // IRR is complex to calculate (needs cash flow dates), use fund settings or estimate
+      // For now, show from fund settings if available, otherwise show "--"
+      const irr = fundData?.irr || null;
+      
+      document.getElementById('metric-aum').textContent = formatCurrency(aum);
+      document.getElementById('metric-irr').textContent = irr !== null ? formatPercent(irr) : '--';
+      document.getElementById('metric-moic').textContent = moic.toFixed(2) + 'x';
+      document.getElementById('metric-companies').textContent = companiesData.length;
+      
+      // Also update LP view if applicable
+      document.getElementById('lp-irr').textContent = irr !== null ? formatPercent(irr) : '--';
+      document.getElementById('lp-moic').textContent = moic.toFixed(2) + 'x';
     }
 
     function renderCapital() {
-      const deployed = fundData?.capitalDeployed || 0;
-      const total = fundData?.fundSize || 1;
-      const percent = ((deployed / total) * 100).toFixed(0);
+      // Calculate deployed from portfolio data
+      const deployed = companiesData.reduce((sum, c) => sum + (c.investmentAmount || 0), 0);
+      const total = fundData?.fundSize || deployed || 1;
+      const remaining = Math.max(0, total - deployed);
+      const percent = Math.min(100, ((deployed / total) * 100)).toFixed(0);
       
       document.getElementById('capital-deployed').textContent = formatCurrency(deployed);
-      document.getElementById('capital-remaining').textContent = formatCurrency(fundData?.capitalRemaining);
+      document.getElementById('capital-remaining').textContent = formatCurrency(remaining);
       document.getElementById('capital-progress').style.width = percent + '%';
       document.getElementById('capital-percent').textContent = percent + '% deployed';
     }
