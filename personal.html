@@ -210,6 +210,7 @@
           client_id: '728812948064-2kdc14o4emgtn9ak4tioqme5d62ev6sa.apps.googleusercontent.com',
           scope: 'https://www.googleapis.com/auth/calendar.readonly',
           callback: async (response) => {
+            alert('Callback received! Token: ' + (response.access_token ? 'YES' : 'NO') + ', Error: ' + (response.error || 'none'));
             console.log('OAuth callback received:', response);
             if (response.error) {
               console.error('OAuth error in callback:', response.error);
@@ -232,7 +233,7 @@
         });
         
         console.log('Requesting access token...');
-        client.requestAccessToken({ prompt: 'consent' });
+        client.requestAccessToken();
       } catch (error) {
         console.error('Calendar connection error:', error);
         document.getElementById('calendar-loading').style.display = 'none';
