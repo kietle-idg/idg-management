@@ -393,9 +393,9 @@
 
         const result = await Database.updateFund(fundData);
         if (result.success) {
-          alert('Fund settings saved successfully!');
+          showToast('Fund settings saved successfully!');
         } else {
-          alert('Error saving fund settings');
+          showToast('Error saving fund settings', true);
         }
       });
     }
@@ -436,9 +436,9 @@
       if (result.success) {
         hideAddUserModal();
         await loadAdminData();
-        alert('User created successfully!');
+        showToast('User created successfully!');
       } else {
-        alert('Error creating user: ' + result.error);
+        showToast('Error creating user: ' + result.error, true);
       }
     }
 
@@ -470,7 +470,7 @@
       const commitment = document.getElementById('edit-user-commitment').value;
 
       if (!name) {
-        alert('Name is required');
+        showToast('Name is required', true);
         return;
       }
 
@@ -486,16 +486,16 @@
       if (result.success) {
         hideEditUserModal();
         await loadAdminData();
-        alert('User updated successfully!');
+        showToast('User updated successfully!');
       } else {
-        alert('Error updating user');
+        showToast('Error updating user', true);
       }
     }
 
     async function deleteUser(userId, userName) {
       // Don't allow deleting yourself
       if (userId === Auth.currentUser?.uid) {
-        alert('You cannot delete your own account');
+        showToast('You cannot delete your own account', true);
         return;
       }
 
@@ -506,10 +506,41 @@
       try {
         await firebaseDb.collection('users').doc(userId).delete();
         await loadAdminData();
-        alert('User deleted successfully');
+        showToast('User deleted successfully');
       } catch (error) {
-        alert('Error deleting user: ' + error.message);
+        showToast('Error deleting user: ' + error.message, true);
       }
+    }
+
+    // Toast notification function
+    function showToast(message, isError = false) {
+      // Remove existing toast
+      const existing = document.getElementById('toast');
+      if (existing) existing.remove();
+
+      const toast = document.createElement('div');
+      toast.id = 'toast';
+      toast.textContent = message;
+      toast.style.cssText = `
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        padding: 12px 24px;
+        background: ${isError ? '#EF4444' : '#10B981'};
+        color: white;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 9999;
+        animation: slideIn 0.3s ease;
+      `;
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
     }
 
     // Edit role change handler
