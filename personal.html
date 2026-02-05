@@ -188,25 +188,36 @@
       localStorage.removeItem('googleCalendarToken');
     }
 
-    // Connect to Google Calendar
+    // Connect to Google Calendar using Google Identity Services
     async function connectGoogleCalendar() {
       document.getElementById('calendar-loading').style.display = 'block';
       document.getElementById('calendar-connect').style.display = 'none';
       document.getElementById('events-list').innerHTML = '';
       
       try {
-        // Use Google Sign-In popup
-        const provider = new firebase.auth.GoogleAuthProvider();
-        provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
+        // Use Google Identity Services for OAuth
+        const client = google.accounts.oauth2.initTokenClient({
+          client_id: '728812948064-2kdc14o4emgtn9ak4tioqme5d62ev6sa.apps.googleusercontent.com',
+          scope: 'https://www.googleapis.com/auth/calendar.readonly',
+          callback: async (response) => {
+            if (response.access_token) {
+              storeCalendarToken(response.access_token);
+              await fetchCalendarEvents(response.access_token);
+            } else {
+              document.getElementById('calendar-loading').style.display = 'none';
+              document.getElementById('calendar-connect').style.display = 'block';
+              showToast('Could not get calendar access', true);
+            }
+          },
+          error_callback: (error) => {
+            console.error('OAuth error:', error);
+            document.getElementById('calendar-loading').style.display = 'none';
+            document.getElementById('calendar-connect').style.display = 'block';
+            showToast('Could not connect to calendar', true);
+          }
+        });
         
-        const result = await firebase.auth().signInWithPopup(provider);
-        const credential = result.credential;
-        const token = credential.accessToken;
-        
-        if (token) {
-          storeCalendarToken(token);
-          await fetchCalendarEvents(token);
-        }
+        client.requestAccessToken();
       } catch (error) {
         console.error('Calendar connection error:', error);
         document.getElementById('calendar-loading').style.display = 'none';
