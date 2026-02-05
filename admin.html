@@ -209,6 +209,44 @@
         </div>
       </div>
     </div>
+
+    <!-- Edit User Modal -->
+    <div class="modal-overlay" id="edit-user-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3 class="modal-title">Edit User</h3>
+          <button class="modal-close" onclick="hideEditUserModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="edit-user-id">
+          <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <input type="text" class="form-input" id="edit-user-name" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Role</label>
+            <select class="form-input form-select" id="edit-user-role" required>
+              <option value="Team">Team Member</option>
+              <option value="GP">General Partner</option>
+              <option value="LP">Limited Partner</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Title</label>
+            <input type="text" class="form-input" id="edit-user-title" placeholder="e.g. Associate, Partner">
+          </div>
+          <div class="form-group" id="edit-commitment-group" style="display: none;">
+            <label class="form-label">Commitment ($)</label>
+            <input type="number" class="form-input" id="edit-user-commitment" placeholder="25000000">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="hideEditUserModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveUserEdit()">Save Changes</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Firebase SDK -->
@@ -313,6 +351,7 @@
             <td>${joined}</td>
             <td class="text-right">
               <button class="btn btn-ghost btn-sm" onclick="editUser('${user.id}')">Edit</button>
+              <button class="btn btn-ghost btn-sm" style="color: var(--danger);" onclick="deleteUser('${user.id}', '${user.name}')">Delete</button>
             </td>
           </tr>
         `;
@@ -404,10 +443,79 @@
     }
 
     function editUser(userId) {
-      // Could open edit modal
-      console.log('Edit user:', userId);
-      alert('Edit functionality coming soon');
+      const user = allUsers.find(u => u.id === userId);
+      if (!user) return;
+
+      document.getElementById('edit-user-id').value = userId;
+      document.getElementById('edit-user-name').value = user.name || '';
+      document.getElementById('edit-user-role').value = user.role || 'Team';
+      document.getElementById('edit-user-title').value = user.title || '';
+      document.getElementById('edit-user-commitment').value = user.commitment || '';
+      
+      // Show/hide commitment field
+      document.getElementById('edit-commitment-group').style.display = user.role === 'LP' ? 'block' : 'none';
+      
+      document.getElementById('edit-user-modal').classList.add('visible');
     }
+
+    function hideEditUserModal() {
+      document.getElementById('edit-user-modal').classList.remove('visible');
+    }
+
+    async function saveUserEdit() {
+      const userId = document.getElementById('edit-user-id').value;
+      const name = document.getElementById('edit-user-name').value;
+      const role = document.getElementById('edit-user-role').value;
+      const title = document.getElementById('edit-user-title').value;
+      const commitment = document.getElementById('edit-user-commitment').value;
+
+      if (!name) {
+        alert('Name is required');
+        return;
+      }
+
+      const userData = {
+        name,
+        role,
+        title,
+        commitment: role === 'LP' ? parseInt(commitment) || 0 : null
+      };
+
+      const result = await Database.updateUser(userId, userData);
+      
+      if (result.success) {
+        hideEditUserModal();
+        await loadAdminData();
+        alert('User updated successfully!');
+      } else {
+        alert('Error updating user');
+      }
+    }
+
+    async function deleteUser(userId, userName) {
+      // Don't allow deleting yourself
+      if (userId === Auth.currentUser?.uid) {
+        alert('You cannot delete your own account');
+        return;
+      }
+
+      if (!confirm(`Are you sure you want to delete "${userName}"? This cannot be undone.`)) {
+        return;
+      }
+
+      try {
+        await firebaseDb.collection('users').doc(userId).delete();
+        await loadAdminData();
+        alert('User deleted successfully');
+      } catch (error) {
+        alert('Error deleting user: ' + error.message);
+      }
+    }
+
+    // Edit role change handler
+    document.getElementById('edit-user-role')?.addEventListener('change', (e) => {
+      document.getElementById('edit-commitment-group').style.display = e.target.value === 'LP' ? 'block' : 'none';
+    });
 
     // Initialize
     initAdmin();
