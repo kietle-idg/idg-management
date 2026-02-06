@@ -1,7 +1,8 @@
 {
   "rewrites": [
     { "source": "/api/sync-drive", "destination": "/api/sync-drive.js" },
-    { "source": "/api/sync-sheets", "destination": "/api/sync-sheets.js" }
+    { "source": "/api/sync-sheets", "destination": "/api/sync-sheets.js" },
+    { "source": "/api/calendar-events", "destination": "/api/calendar-events.js" }
   ],
   "functions": {
     "api/*.js": {

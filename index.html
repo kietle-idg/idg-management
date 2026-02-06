@@ -212,14 +212,14 @@
         document.getElementById('nav-portfolio').style.display = 'none';
       }
 
-      // Load data from Firebase with timeout
+      // Load data from Firebase and Google Calendar
       try {
         const timeout = ms => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms));
         
         [fundData, companiesData, eventsData] = await Promise.all([
           Promise.race([Database.getFund(), timeout(5000)]).catch(() => null),
           Promise.race([Database.getCompanies(), timeout(5000)]).catch(() => []),
-          Promise.race([Database.getEvents(), timeout(5000)]).catch(() => [])
+          Promise.race([fetchCalendarEvents(), timeout(10000)]).catch(() => [])
         ]);
       } catch (error) {
         console.error('Data loading error:', error);
@@ -376,21 +376,30 @@
       document.getElementById('top-companies').innerHTML = html || '<tr><td colspan="3" class="text-center text-muted">No companies</td></tr>';
     }
 
-    function renderEvents() {
-      const user = Auth.currentUserData;
-      let events = eventsData
-        .filter(e => getDaysUntil(e.date) >= 0)
-        .sort((a, b) => new Date(a.date) - new Date(b.date));
-
-      // Filter by attendee for non-GP roles
-      if (user?.role === 'LP' || user?.role === 'Team') {
-        events = events.filter(e => e.attendees?.includes(user.id));
+    async function fetchCalendarEvents() {
+      try {
+        const response = await fetch('/api/calendar-events');
+        const data = await response.json();
+        if (data.success && data.events) {
+          return data.events;
+        }
+        console.warn('Calendar API:', data.error || 'No events');
+        return [];
+      } catch (error) {
+        console.error('Failed to fetch calendar events:', error);
+        return [];
       }
+    }
 
-      events = events.slice(0, 5);
+    function renderEvents() {
+      let events = (eventsData || [])
+        .filter(e => e.date && getDaysUntil(e.date) >= 0)
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
+        .slice(0, 5);
 
       const html = events.map(e => {
         const d = formatDateShort(e.date);
+        const location = e.location ? ` · ${e.location}` : '';
         return `
           <li class="list-item">
             <div class="event-date">
@@ -399,7 +408,7 @@
             </div>
             <div class="event-content">
               <div class="event-title">${e.title}</div>
-              <div class="event-meta">${e.time} · ${e.location}<span class="event-type">${e.type}</span></div>
+              <div class="event-meta">${e.time || ''}${location}</div>
             </div>
           </li>
         `;
