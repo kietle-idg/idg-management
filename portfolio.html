@@ -136,6 +136,7 @@
                       <th class="text-right">Entry Valuation</th>
                       <th class="text-right">Current Valuation</th>
                       <th class="text-right">Ownership</th>
+                      <th class="text-right">Net Value</th>
                       <th class="text-right">MOIC</th>
                       <th>Status</th>
                       <th class="text-right">Actions</th>
@@ -415,7 +416,11 @@
 
       const active = companies.filter(c => c.status === 'Active');
       const totalInvested = companies.reduce((sum, c) => sum + (c.investmentAmount || 0), 0);
-      const totalValue = companies.reduce((sum, c) => sum + ((c.currentValuation || 0) * (c.ownership || 0) / 100), 0);
+      // Use netValue from sheet if available, otherwise fall back to valuation × ownership
+      const totalValue = companies.reduce((sum, c) => {
+        if (c.netValue && c.netValue > 0) return sum + c.netValue;
+        return sum + ((c.currentValuation || 0) * (c.ownership || 0) / 100);
+      }, 0);
 
       document.getElementById('total-companies').textContent = companies.length;
       document.getElementById('active-companies').textContent = active.length;
@@ -464,6 +469,7 @@
           <td class="text-right value">${formatCurrency(c.entryValuation)}</td>
           <td class="text-right value">${formatCurrency(c.currentValuation)}</td>
           <td class="text-right">${(c.ownership || 0).toFixed(1)}%</td>
+          <td class="text-right value">${formatCurrency(c.netValue)}</td>
           <td class="text-right" style="font-weight: 600; color: ${(c.moic || 0) >= 1 ? 'var(--success)' : 'var(--danger)'};">${c.moic ? c.moic.toFixed(2) + 'x' : '-'}</td>
           <td><span class="badge ${c.status === 'Active' ? 'badge-success' : 'badge-default'}">${c.status}</span></td>
           <td class="text-right">
@@ -475,7 +481,7 @@
         </tr>
       `).join('');
 
-      document.getElementById('portfolio-table').innerHTML = html || '<tr><td colspan="9" class="text-center text-muted" style="padding: 48px;">No companies found</td></tr>';
+      document.getElementById('portfolio-table').innerHTML = html || '<tr><td colspan="10" class="text-center text-muted" style="padding: 48px;">No companies found</td></tr>';
     }
 
     function setupFilters() {
