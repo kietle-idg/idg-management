@@ -307,14 +307,6 @@
               <input type="number" step="0.001" class="form-input" id="edit-company-ownership">
             </div>
             <div class="form-group">
-              <label class="form-label">Net Value ($)</label>
-              <input type="number" class="form-input" id="edit-company-net-value" placeholder="Leave blank to auto-calculate">
-            </div>
-            <div class="form-group">
-              <label class="form-label">MOIC (x)</label>
-              <input type="number" step="0.01" class="form-input" id="edit-company-moic" placeholder="Leave blank to auto-calculate">
-            </div>
-            <div class="form-group">
               <label class="form-label">Founder Name</label>
               <input type="text" class="form-input" id="edit-company-founder">
             </div>
@@ -678,8 +670,6 @@
       document.getElementById('edit-company-entry-valuation').value = company.entryValuation || '';
       document.getElementById('edit-company-valuation').value = company.currentValuation || '';
       document.getElementById('edit-company-ownership').value = company.ownership || '';
-      document.getElementById('edit-company-net-value').value = company.netValue || '';
-      document.getElementById('edit-company-moic').value = company.moic || '';
       document.getElementById('edit-company-founder').value = company.founder || '';
       document.getElementById('edit-company-founder-email').value = company.founderEmail || '';
       document.getElementById('edit-company-location').value = company.location || '';
@@ -702,18 +692,35 @@
         return;
       }
 
+      const investmentAmount = parseInt(document.getElementById('edit-company-investment').value) || 0;
+      const entryValuation = parseInt(document.getElementById('edit-company-entry-valuation').value) || 0;
+      const currentValuation = parseInt(document.getElementById('edit-company-valuation').value) || 0;
+      const ownership = parseFloat(document.getElementById('edit-company-ownership').value) || 0;
+
+      // Auto-calculate MOIC: current valuation / entry valuation
+      let moic = 0;
+      if (currentValuation > 0 && entryValuation > 0) {
+        moic = currentValuation / entryValuation;
+      }
+
+      // Auto-calculate Net Value: investment × MOIC
+      let netValue = 0;
+      if (moic > 0 && investmentAmount > 0) {
+        netValue = Math.round(investmentAmount * moic);
+      }
+
       const companyData = {
         name,
         sector,
         stage: document.getElementById('edit-company-stage').value,
         status: document.getElementById('edit-company-status').value,
         investmentDate: document.getElementById('edit-company-date').value || null,
-        investmentAmount: parseInt(document.getElementById('edit-company-investment').value) || 0,
-        entryValuation: parseInt(document.getElementById('edit-company-entry-valuation').value) || 0,
-        currentValuation: parseInt(document.getElementById('edit-company-valuation').value) || 0,
-        ownership: parseFloat(document.getElementById('edit-company-ownership').value) || 0,
-        netValue: parseFloat(document.getElementById('edit-company-net-value').value) || 0,
-        moic: parseFloat(document.getElementById('edit-company-moic').value) || 0,
+        investmentAmount,
+        entryValuation,
+        currentValuation,
+        ownership,
+        netValue,
+        moic,
         founder: document.getElementById('edit-company-founder').value || null,
         founderEmail: document.getElementById('edit-company-founder-email').value || null,
         location: document.getElementById('edit-company-location').value || null,
