@@ -139,8 +139,8 @@
                     <thead>
                       <tr>
                         <th>Company</th>
-                        <th class="text-right">Valuation</th>
-                        <th>Stage</th>
+                        <th class="text-right">Net Value</th>
+                        <th>MOIC</th>
                       </tr>
                     </thead>
                     <tbody id="top-companies"></tbody>
@@ -297,21 +297,30 @@
       return 'badge-default';
     }
 
+    // Same calculation logic as portfolio page
+    function getCompanyMoic(c) {
+      if (c.currentValuation > 0 && c.entryValuation > 0) return c.currentValuation / c.entryValuation;
+      if (c.moic && c.moic > 0) return c.moic;
+      return 0;
+    }
+
+    function getCompanyNetValue(c) {
+      const moic = getCompanyMoic(c);
+      if (moic > 0 && c.investmentAmount > 0) return Math.round(c.investmentAmount * moic);
+      return 0;
+    }
+
     function renderMetrics() {
-      // Calculate AUM from portfolio (sum of our share of each company's valuation)
-      const aum = companiesData.reduce((sum, c) => {
-        const ourValue = (c.currentValuation || 0) * (c.ownership || 0) / 100;
-        return sum + ourValue;
-      }, 0);
+      // AUM = sum of net values (Invested × MOIC for each company)
+      const aum = companiesData.reduce((sum, c) => sum + getCompanyNetValue(c), 0);
       
-      // Calculate total invested
+      // Total invested
       const totalInvested = companiesData.reduce((sum, c) => sum + (c.investmentAmount || 0), 0);
       
-      // Calculate MOIC (Multiple on Invested Capital)
+      // Portfolio MOIC = total net value / total invested
       const moic = totalInvested > 0 ? aum / totalInvested : 0;
       
-      // IRR is complex to calculate (needs cash flow dates), use fund settings or estimate
-      // For now, show from fund settings if available, otherwise show "--"
+      // IRR from fund settings (complex to calculate, needs cash flow dates)
       const irr = fundData?.irr || null;
       
       document.getElementById('metric-aum').textContent = formatCurrency(aum);
@@ -340,24 +349,29 @@
     function renderTopCompanies() {
       const top = companiesData
         .filter(c => c.status === 'Active')
-        .sort((a, b) => (b.currentValuation || 0) - (a.currentValuation || 0))
+        .sort((a, b) => getCompanyNetValue(b) - getCompanyNetValue(a))
         .slice(0, 5);
 
-      const html = top.map(c => `
-        <tr>
-          <td>
-            <div class="company-cell">
-              <div class="company-icon">${c.logo || c.name?.charAt(0)}</div>
-              <div>
-                <div class="company-name">${c.name}</div>
-                <div class="company-sector">${c.sector}</div>
+      const html = top.map(c => {
+        const moic = getCompanyMoic(c);
+        const netVal = getCompanyNetValue(c);
+        const moicColor = moic >= 1 ? 'var(--success)' : 'var(--danger)';
+        return `
+          <tr>
+            <td>
+              <div class="company-cell">
+                <div class="company-icon">${c.logo || c.name?.charAt(0)}</div>
+                <div>
+                  <div class="company-name">${c.name}</div>
+                  <div class="company-sector">${c.sector}</div>
+                </div>
               </div>
-            </div>
-          </td>
-          <td class="text-right value">${formatCurrency(c.currentValuation)}</td>
-          <td><span class="badge ${getStageBadgeClass(c.stage)}">${c.stage}</span></td>
-        </tr>
-      `).join('');
+            </td>
+            <td class="text-right value">${formatCurrency(netVal)}</td>
+            <td><span style="font-weight:600;color:${moicColor}">${moic > 0 ? moic.toFixed(2) + 'x' : '-'}</span></td>
+          </tr>
+        `;
+      }).join('');
 
       document.getElementById('top-companies').innerHTML = html || '<tr><td colspan="3" class="text-center text-muted">No companies</td></tr>';
     }
