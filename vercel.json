@@ -1,4 +1,8 @@
 {
+  "rewrites": [
+    { "source": "/api/sync-drive", "destination": "/api/sync-drive.js" },
+    { "source": "/api/sync-sheets", "destination": "/api/sync-sheets.js" }
+  ],
   "functions": {
     "api/*.js": {
       "memory": 1024,

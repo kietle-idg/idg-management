@@ -57,13 +57,21 @@
             <h1 class="page-title">Portfolio Companies</h1>
             <p class="page-subtitle">All investments in IDGX Capital Fund III</p>
           </div>
-          <button class="btn btn-primary" onclick="showAddCompanyModal()" id="add-company-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            Add Company
-          </button>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary" onclick="syncFromSheets()" id="sync-sheets-btn" style="display: none;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8V3"></path>
+              </svg>
+              <span id="sync-sheets-text">Sync from Sheets</span>
+            </button>
+            <button class="btn btn-primary" onclick="showAddCompanyModal()" id="add-company-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              Add Company
+            </button>
+          </div>
         </div>
 
         <!-- Loading State -->
@@ -128,7 +136,7 @@
                       <th class="text-right">Entry Valuation</th>
                       <th class="text-right">Current Valuation</th>
                       <th class="text-right">Ownership</th>
-                      <th>Founder</th>
+                      <th class="text-right">MOIC</th>
                       <th>Status</th>
                       <th class="text-right">Actions</th>
                     </tr>
@@ -367,9 +375,11 @@
         return;
       }
 
-      // Only Admin and GP can add/edit companies
+      // Only Admin and GP can add/edit companies and sync
       if (role !== 'Admin' && role !== 'GP') {
         document.getElementById('add-company-btn').style.display = 'none';
+      } else {
+        document.getElementById('sync-sheets-btn').style.display = 'inline-flex';
       }
 
       // Load companies from Firebase
@@ -454,7 +464,7 @@
           <td class="text-right value">${formatCurrency(c.entryValuation)}</td>
           <td class="text-right value">${formatCurrency(c.currentValuation)}</td>
           <td class="text-right">${(c.ownership || 0).toFixed(1)}%</td>
-          <td>${c.founder || '-'}</td>
+          <td class="text-right" style="font-weight: 600; color: ${(c.moic || 0) >= 1 ? 'var(--success)' : 'var(--danger)'};">${c.moic ? c.moic.toFixed(2) + 'x' : '-'}</td>
           <td><span class="badge ${c.status === 'Active' ? 'badge-success' : 'badge-default'}">${c.status}</span></td>
           <td class="text-right">
             ${canEdit ? `
@@ -501,11 +511,12 @@
         formatCurrency(c.entryValuation),
         formatCurrency(c.currentValuation),
         (c.ownership || 0).toFixed(1) + '%',
+        c.moic ? c.moic.toFixed(2) + 'x' : '-',
         c.status
       ]);
 
       doc.autoTable({
-        head: [['Company', 'Stage', 'Invested', 'Entry Valuation', 'Current Valuation', 'Ownership', 'Status']],
+        head: [['Company', 'Stage', 'Invested', 'Entry Valuation', 'Current Valuation', 'Ownership', 'MOIC', 'Status']],
         body: tableData,
         startY: 40,
         styles: { fontSize: 9 },
@@ -525,8 +536,10 @@
         'Entry Valuation': c.entryValuation,
         'Current Valuation': c.currentValuation,
         'Ownership %': c.ownership,
-        'Founder': c.founder,
+        'MOIC': c.moic ? c.moic.toFixed(2) + 'x' : '-',
+        'Net Value': c.netValue,
         'Status': c.status,
+        'Investors': c.investors,
         'Location': c.location
       }));
 
@@ -696,6 +709,89 @@
         showToast('Company deleted successfully');
       } else {
         showToast('Error deleting company', true);
+      }
+    }
+
+    // ========================
+    // SYNC FROM GOOGLE SHEETS
+    // ========================
+    async function syncFromSheets() {
+      const btn = document.getElementById('sync-sheets-btn');
+      const btnText = document.getElementById('sync-sheets-text');
+      btn.disabled = true;
+      btnText.textContent = 'Syncing...';
+
+      try {
+        const response = await fetch('/api/sync-sheets');
+        const data = await response.json();
+
+        if (!data.success) {
+          throw new Error(data.error || 'Sync failed');
+        }
+
+        if (!data.companies || data.companies.length === 0) {
+          showToast('No companies found in the sheet', true);
+          return;
+        }
+
+        // Match sheet data to existing Firebase companies & update/create
+        let updated = 0;
+        let created = 0;
+
+        for (const sheetCompany of data.companies) {
+          // Normalize name for matching
+          const normalize = (n) => (n || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const sheetNameNorm = normalize(sheetCompany.name);
+
+          // Find existing company by name
+          const existing = companiesData.find(c => {
+            const existingNorm = normalize(c.name);
+            return existingNorm === sheetNameNorm || 
+                   existingNorm.includes(sheetNameNorm) || 
+                   sheetNameNorm.includes(existingNorm);
+          });
+
+          // Build update data from the sheet (only update financial fields)
+          const updateData = {};
+          if (sheetCompany.investmentAmount > 0) updateData.investmentAmount = sheetCompany.investmentAmount;
+          if (sheetCompany.entryValuation > 0) updateData.entryValuation = sheetCompany.entryValuation;
+          if (sheetCompany.currentValuation > 0) updateData.currentValuation = sheetCompany.currentValuation;
+          if (sheetCompany.ownership > 0) updateData.ownership = sheetCompany.ownership;
+          if (sheetCompany.moic > 0) updateData.moic = sheetCompany.moic;
+          if (sheetCompany.netValue > 0) updateData.netValue = sheetCompany.netValue;
+          if (sheetCompany.investmentDate) updateData.investmentDate = sheetCompany.investmentDate;
+          if (sheetCompany.investors) updateData.investors = sheetCompany.investors;
+
+          if (existing) {
+            // Update existing company
+            await Database.updateCompany(existing.id, updateData);
+            updated++;
+          } else {
+            // Create new company
+            await Database.createCompany({
+              name: sheetCompany.name,
+              sector: '-',
+              stage: 'Seed',
+              status: 'Active',
+              ...updateData
+            });
+            created++;
+          }
+        }
+
+        // Reload data
+        companiesData = await Database.getCompanies();
+        renderSummary();
+        renderTable();
+
+        showToast(`Sync complete! ${updated} updated, ${created} created from ${data.companiesFound} sheet rows.`);
+
+      } catch (error) {
+        console.error('Sheets sync error:', error);
+        showToast('Sync error: ' + error.message, true);
+      } finally {
+        btn.disabled = false;
+        btnText.textContent = 'Sync from Sheets';
       }
     }
 
