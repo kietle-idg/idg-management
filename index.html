@@ -71,10 +71,6 @@
               <div class="metric-label">Total AUM</div>
             </div>
             <div class="metric">
-              <div class="metric-value positive" id="metric-irr">0%</div>
-              <div class="metric-label">Net IRR</div>
-            </div>
-            <div class="metric">
               <div class="metric-value positive" id="metric-moic">0x</div>
               <div class="metric-label">MOIC</div>
             </div>
@@ -91,10 +87,6 @@
               <div class="commitment-value" id="lp-commitment">$0</div>
             </div>
             <div class="metrics" style="margin-bottom: 0;">
-              <div class="metric">
-                <div class="metric-value positive" id="lp-irr">0%</div>
-                <div class="metric-label">Net IRR</div>
-              </div>
               <div class="metric">
                 <div class="metric-value positive" id="lp-moic">0x</div>
                 <div class="metric-label">MOIC</div>
@@ -255,7 +247,6 @@
         document.getElementById('companies-section').classList.add('hidden');
         document.getElementById('page-subtitle').textContent = 'Your investment overview';
         
-        document.getElementById('lp-irr').textContent = formatPercent(fundData?.irr);
         document.getElementById('lp-moic').textContent = (fundData?.moic || 0).toFixed(2) + 'x';
         document.getElementById('lp-commitment').textContent = formatCurrency(user?.commitment || 0);
         
@@ -339,16 +330,11 @@
       // Portfolio MOIC = total net value / total invested
       const moic = totalInvested > 0 ? aum / totalInvested : 0;
       
-      // IRR from fund settings (complex to calculate, needs cash flow dates)
-      const irr = fundData?.irr || null;
-      
       document.getElementById('metric-aum').textContent = formatCurrency(aum);
-      document.getElementById('metric-irr').textContent = irr !== null ? formatPercent(irr) : '--';
       document.getElementById('metric-moic').textContent = moic.toFixed(2) + 'x';
       document.getElementById('metric-companies').textContent = companiesData.length;
       
       // Also update LP view if applicable
-      document.getElementById('lp-irr').textContent = irr !== null ? formatPercent(irr) : '--';
       document.getElementById('lp-moic').textContent = moic.toFixed(2) + 'x';
     }
 
