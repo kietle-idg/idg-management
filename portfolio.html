@@ -416,10 +416,11 @@
 
       const active = companies.filter(c => c.status === 'Active');
       const totalInvested = companies.reduce((sum, c) => sum + (c.investmentAmount || 0), 0);
-      // Use netValue from sheet if available, otherwise fall back to valuation × ownership
+      // Current Value = sum of (Investment Amount × MOIC) for each company
       const totalValue = companies.reduce((sum, c) => {
-        if (c.netValue && c.netValue > 0) return sum + c.netValue;
-        return sum + ((c.currentValuation || 0) * (c.ownership || 0) / 100);
+        const moic = c.moic || 0;
+        const invested = c.investmentAmount || 0;
+        return sum + (invested * moic);
       }, 0);
 
       document.getElementById('total-companies').textContent = companies.length;
