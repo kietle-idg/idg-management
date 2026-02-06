@@ -1,7 +1,7 @@
 const { google } = require('googleapis');
 
-const SPREADSHEET_ID = '1F4R-jSZKpTO17KWuzsiM4Iqifc3Gpt4q';
-const SHEET_GID = 531872804;
+const SPREADSHEET_ID = '1FOqG47xZxQfUrqYcZt_xJT4upRAxBMPyol6oDKBiRHE';
+const SHEET_GID = 444195703;
 
 function getGoogleAuth() {
   if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
