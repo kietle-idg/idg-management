@@ -153,9 +153,24 @@
             <div class="card">
               <div class="card-header">
                 <h3 class="card-title">Upcoming Events</h3>
-                <a href="personal.html" class="btn btn-ghost btn-sm">View all</a>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <button class="btn btn-primary btn-sm" id="connect-calendar-btn" style="display: none;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                      <line x1="16" y1="2" x2="16" y2="6"></line>
+                      <line x1="8" y1="2" x2="8" y2="6"></line>
+                      <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    Connect Calendar
+                  </button>
+                  <a href="personal.html" class="btn btn-ghost btn-sm">View all</a>
+                </div>
               </div>
               <div class="card-body">
+                <div id="calendar-loading" style="display: none; text-align: center; padding: 16px; color: var(--text-muted);">
+                  <div class="spinner" style="width: 20px; height: 20px; border-width: 2px; margin: 0 auto 8px;"></div>
+                  Loading calendar...
+                </div>
                 <ul class="list" id="upcoming-events"></ul>
               </div>
             </div>
@@ -172,6 +187,9 @@
   <script src="firebase-config.js"></script>
   <script src="auth.js"></script>
   <script src="database.js"></script>
+  <!-- Google API for Calendar -->
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   
   <script>
     let fundData = null;
@@ -212,21 +230,22 @@
         document.getElementById('nav-portfolio').style.display = 'none';
       }
 
-      // Load data from Firebase and Google Calendar
+      // Load data from Firebase
       try {
         const timeout = ms => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms));
         
-        [fundData, companiesData, eventsData] = await Promise.all([
+        [fundData, companiesData] = await Promise.all([
           Promise.race([Database.getFund(), timeout(5000)]).catch(() => null),
-          Promise.race([Database.getCompanies(), timeout(5000)]).catch(() => []),
-          Promise.race([fetchCalendarEvents(), timeout(10000)]).catch(() => [])
+          Promise.race([Database.getCompanies(), timeout(5000)]).catch(() => [])
         ]);
       } catch (error) {
         console.error('Data loading error:', error);
         fundData = null;
         companiesData = [];
-        eventsData = [];
       }
+
+      // Initialize Google Calendar (client-side OAuth)
+      initGoogleCalendar();
 
       // Role-based view
       if (role === 'LP') {
@@ -376,18 +395,111 @@
       document.getElementById('top-companies').innerHTML = html || '<tr><td colspan="3" class="text-center text-muted">No companies</td></tr>';
     }
 
-    async function fetchCalendarEvents() {
-      try {
-        const response = await fetch('/api/calendar-events');
-        const data = await response.json();
-        if (data.success && data.events) {
-          return data.events;
+    // ── Google Calendar (client-side OAuth) ──
+    const CALENDAR_CLIENT_ID = '728812948064-2kdc14o4emgtn9ak4tioqme5d62ev6sa.apps.googleusercontent.com';
+    const CALENDAR_SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
+    const DEAL_CALENDAR_ID = 'deal@idgcapitalvietnam.com';
+    let tokenClient = null;
+    let calendarAccessToken = null;
+
+    function initGoogleCalendar() {
+      // Show connect button
+      const btn = document.getElementById('connect-calendar-btn');
+      btn.style.display = 'inline-flex';
+      btn.onclick = connectCalendar;
+
+      // Wait for GIS library to load, then init token client
+      const waitForGis = setInterval(() => {
+        if (typeof google !== 'undefined' && google.accounts) {
+          clearInterval(waitForGis);
+          tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CALENDAR_CLIENT_ID,
+            scope: CALENDAR_SCOPES,
+            hint: DEAL_CALENDAR_ID,  // Pre-select deal@ account in the popup
+            callback: (tokenResponse) => {
+              if (tokenResponse && tokenResponse.access_token) {
+                calendarAccessToken = tokenResponse.access_token;
+                btn.style.display = 'none';
+                fetchCalendarEvents();
+              }
+            },
+            error_callback: (error) => {
+              console.error('Calendar auth error:', error);
+            }
+          });
         }
-        console.warn('Calendar API:', data.error || 'No events');
-        return [];
+      }, 200);
+
+      // Show placeholder while waiting
+      renderEvents();
+    }
+
+    function connectCalendar() {
+      if (tokenClient) {
+        tokenClient.requestAccessToken();
+      }
+    }
+
+    async function fetchCalendarEvents() {
+      const loadingEl = document.getElementById('calendar-loading');
+      loadingEl.style.display = 'block';
+
+      try {
+        // Try deal@ calendar first, fall back to primary
+        let calendarId = DEAL_CALENDAR_ID;
+        let response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
+          new URLSearchParams({
+            timeMin: new Date().toISOString(),
+            showDeleted: 'false',
+            singleEvents: 'true',
+            maxResults: '10',
+            orderBy: 'startTime'
+          }), {
+            headers: { 'Authorization': `Bearer ${calendarAccessToken}` }
+          });
+
+        // If deal@ calendar not accessible, try primary
+        if (!response.ok) {
+          console.warn('deal@ calendar not accessible, trying primary calendar');
+          calendarId = 'primary';
+          response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events?` +
+            new URLSearchParams({
+              timeMin: new Date().toISOString(),
+              showDeleted: 'false',
+              singleEvents: 'true',
+              maxResults: '10',
+              orderBy: 'startTime'
+            }), {
+              headers: { 'Authorization': `Bearer ${calendarAccessToken}` }
+            });
+        }
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error?.message || `API error ${response.status}`);
+        }
+
+        const data = await response.json();
+        eventsData = (data.items || []).map(event => {
+          const start = event.start.dateTime || event.start.date;
+          const isAllDay = !event.start.dateTime;
+          const startDate = new Date(start);
+          return {
+            title: event.summary || '(No title)',
+            date: isAllDay ? event.start.date : startDate.toISOString().split('T')[0],
+            time: isAllDay ? 'All Day' : startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            location: event.location || '',
+            type: 'Calendar'
+          };
+        });
+
+        renderEvents();
       } catch (error) {
-        console.error('Failed to fetch calendar events:', error);
-        return [];
+        console.error('Calendar fetch error:', error);
+        document.getElementById('upcoming-events').innerHTML =
+          '<li class="empty-state" style="padding: 24px;"><p style="color: var(--danger);">Error loading calendar: ' + error.message + '</p></li>';
+      } finally {
+        loadingEl.style.display = 'none';
       }
     }
 
@@ -414,7 +526,15 @@
         `;
       }).join('');
 
-      document.getElementById('upcoming-events').innerHTML = html || '<li class="empty-state" style="padding: 24px;"><p>No upcoming events</p></li>';
+      if (html) {
+        document.getElementById('upcoming-events').innerHTML = html;
+      } else if (!calendarAccessToken) {
+        document.getElementById('upcoming-events').innerHTML =
+          '<li class="empty-state" style="padding: 24px;"><p>Click "Connect Calendar" to see upcoming events from deal@idgcapitalvietnam.com</p></li>';
+      } else {
+        document.getElementById('upcoming-events').innerHTML =
+          '<li class="empty-state" style="padding: 24px;"><p>No upcoming events</p></li>';
+      }
     }
 
     init();
