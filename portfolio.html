@@ -404,11 +404,16 @@
     }
 
     function getMoic(c) {
-      if (c.moic && c.moic > 0) return c.moic;
-      // Fallback 1: net value / invested
-      if (c.netValue > 0 && c.investmentAmount > 0) return c.netValue / c.investmentAmount;
-      // Fallback 2: current valuation / entry valuation (assumes no dilution)
+      // Always calculate from page data: current valuation / entry valuation
       if (c.currentValuation > 0 && c.entryValuation > 0) return c.currentValuation / c.entryValuation;
+      // Fallback: stored moic from sheet
+      if (c.moic && c.moic > 0) return c.moic;
+      return 0;
+    }
+
+    function getNetValue(c) {
+      const moic = getMoic(c);
+      if (moic > 0 && c.investmentAmount > 0) return Math.round(c.investmentAmount * moic);
       return 0;
     }
 
@@ -436,12 +441,8 @@
 
       const active = companies.filter(c => c.status === 'Active');
       const totalInvested = companies.reduce((sum, c) => sum + (c.investmentAmount || 0), 0);
-      // Current Value = sum of (Investment Amount × MOIC) for each company
-      const totalValue = companies.reduce((sum, c) => {
-        const moic = getMoic(c);
-        const invested = c.investmentAmount || 0;
-        return sum + (invested * moic);
-      }, 0);
+      // Current Value = sum of net values
+      const totalValue = companies.reduce((sum, c) => sum + getNetValue(c), 0);
 
       document.getElementById('total-companies').textContent = companies.length;
       document.getElementById('active-companies').textContent = active.length;
@@ -490,7 +491,7 @@
           <td class="text-right value">${formatCurrency(c.entryValuation)}</td>
           <td class="text-right value">${formatCurrency(c.currentValuation)}</td>
           <td class="text-right">${(c.ownership || 0).toFixed(3)}%</td>
-          <td class="text-right value">${formatCurrency(c.netValue)}</td>
+          <td class="text-right value">${formatCurrency(getNetValue(c))}</td>
           <td class="text-right" style="font-weight: 600; color: ${getMoicColor(c)};">${formatMoic(c)}</td>
           <td><span class="badge ${c.status === 'Active' ? 'badge-success' : 'badge-default'}">${c.status}</span></td>
           <td class="text-right">
