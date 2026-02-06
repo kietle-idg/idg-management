@@ -405,8 +405,10 @@
 
     function getMoic(c) {
       if (c.moic && c.moic > 0) return c.moic;
-      // Auto-calculate: if we have net value and investment, MOIC = net value / invested
+      // Fallback 1: net value / invested
       if (c.netValue > 0 && c.investmentAmount > 0) return c.netValue / c.investmentAmount;
+      // Fallback 2: current valuation / entry valuation (assumes no dilution)
+      if (c.currentValuation > 0 && c.entryValuation > 0) return c.currentValuation / c.entryValuation;
       return 0;
     }
 
