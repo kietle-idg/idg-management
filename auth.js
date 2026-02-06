@@ -138,13 +138,17 @@ const Auth = {
     const messages = {
       'auth/user-not-found': 'No account found with this email.',
       'auth/wrong-password': 'Incorrect password.',
+      'auth/invalid-credential': 'Invalid email or password. Please try again.',
+      'auth/invalid-login-credentials': 'Invalid email or password. Please try again.',
       'auth/email-already-in-use': 'An account with this email already exists.',
       'auth/weak-password': 'Password should be at least 6 characters.',
       'auth/invalid-email': 'Please enter a valid email address.',
       'auth/too-many-requests': 'Too many attempts. Please try again later.',
-      'auth/network-request-failed': 'Network error. Please check your connection.'
+      'auth/network-request-failed': 'Network error. Please check your connection.',
+      'auth/user-disabled': 'This account has been disabled.',
+      'auth/operation-not-allowed': 'Email/password login is not enabled.'
     };
-    return messages[code] || 'An error occurred. Please try again.';
+    return messages[code] || `An error occurred (${code}). Please try again.`;
   }
 };
 
