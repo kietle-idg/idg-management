@@ -471,8 +471,8 @@
         );
       }
 
-      // Sort by valuation
-      companies.sort((a, b) => (b.currentValuation || 0) - (a.currentValuation || 0));
+      // Sort by MOIC (highest first)
+      companies.sort((a, b) => getMoic(b) - getMoic(a));
 
       const canEdit = Auth.currentUserData?.role === 'Admin' || Auth.currentUserData?.role === 'Team';
       
