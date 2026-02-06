@@ -125,7 +125,8 @@
                       <th>Company</th>
                       <th>Stage</th>
                       <th class="text-right">Invested</th>
-                      <th class="text-right">Valuation</th>
+                      <th class="text-right">Entry Valuation</th>
+                      <th class="text-right">Current Valuation</th>
                       <th class="text-right">Ownership</th>
                       <th>Founder</th>
                       <th>Status</th>
@@ -201,6 +202,10 @@
               <div class="form-group">
                 <label class="form-label">Investment Amount ($)</label>
                 <input type="number" class="form-input" id="company-investment" placeholder="5000000">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Valuation at Entry ($)</label>
+                <input type="number" class="form-input" id="company-entry-valuation" placeholder="10000000">
               </div>
               <div class="form-group">
                 <label class="form-label">Current Valuation ($)</label>
@@ -279,6 +284,10 @@
             <div class="form-group">
               <label class="form-label">Investment Amount ($)</label>
               <input type="number" class="form-input" id="edit-company-investment">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Valuation at Entry ($)</label>
+              <input type="number" class="form-input" id="edit-company-entry-valuation">
             </div>
             <div class="form-group">
               <label class="form-label">Current Valuation ($)</label>
@@ -442,6 +451,7 @@
           </td>
           <td><span class="badge ${getStageBadgeClass(c.stage)}">${c.stage}</span></td>
           <td class="text-right value">${formatCurrency(c.investmentAmount)}</td>
+          <td class="text-right value">${formatCurrency(c.entryValuation)}</td>
           <td class="text-right value">${formatCurrency(c.currentValuation)}</td>
           <td class="text-right">${(c.ownership || 0).toFixed(1)}%</td>
           <td>${c.founder || '-'}</td>
@@ -455,7 +465,7 @@
         </tr>
       `).join('');
 
-      document.getElementById('portfolio-table').innerHTML = html || '<tr><td colspan="8" class="text-center text-muted" style="padding: 48px;">No companies found</td></tr>';
+      document.getElementById('portfolio-table').innerHTML = html || '<tr><td colspan="9" class="text-center text-muted" style="padding: 48px;">No companies found</td></tr>';
     }
 
     function setupFilters() {
@@ -488,13 +498,14 @@
         c.name,
         c.stage,
         formatCurrency(c.investmentAmount),
+        formatCurrency(c.entryValuation),
         formatCurrency(c.currentValuation),
         (c.ownership || 0).toFixed(1) + '%',
         c.status
       ]);
 
       doc.autoTable({
-        head: [['Company', 'Stage', 'Invested', 'Valuation', 'Ownership', 'Status']],
+        head: [['Company', 'Stage', 'Invested', 'Entry Valuation', 'Current Valuation', 'Ownership', 'Status']],
         body: tableData,
         startY: 40,
         styles: { fontSize: 9 },
@@ -511,7 +522,8 @@
         'Stage': c.stage,
         'Investment Date': c.investmentDate,
         'Invested': c.investmentAmount,
-        'Valuation': c.currentValuation,
+        'Entry Valuation': c.entryValuation,
+        'Current Valuation': c.currentValuation,
         'Ownership %': c.ownership,
         'Founder': c.founder,
         'Status': c.status,
@@ -581,6 +593,7 @@
         status,
         investmentDate: document.getElementById('company-date').value || null,
         investmentAmount: parseInt(document.getElementById('company-investment').value) || 0,
+        entryValuation: parseInt(document.getElementById('company-entry-valuation').value) || 0,
         currentValuation: parseInt(document.getElementById('company-valuation').value) || 0,
         ownership: parseFloat(document.getElementById('company-ownership').value) || 0,
         founder: document.getElementById('company-founder').value || null,
@@ -614,6 +627,7 @@
       document.getElementById('edit-company-status').value = company.status || 'Active';
       document.getElementById('edit-company-date').value = company.investmentDate || '';
       document.getElementById('edit-company-investment').value = company.investmentAmount || '';
+      document.getElementById('edit-company-entry-valuation').value = company.entryValuation || '';
       document.getElementById('edit-company-valuation').value = company.currentValuation || '';
       document.getElementById('edit-company-ownership').value = company.ownership || '';
       document.getElementById('edit-company-founder').value = company.founder || '';
@@ -645,6 +659,7 @@
         status: document.getElementById('edit-company-status').value,
         investmentDate: document.getElementById('edit-company-date').value || null,
         investmentAmount: parseInt(document.getElementById('edit-company-investment').value) || 0,
+        entryValuation: parseInt(document.getElementById('edit-company-entry-valuation').value) || 0,
         currentValuation: parseInt(document.getElementById('edit-company-valuation').value) || 0,
         ownership: parseFloat(document.getElementById('edit-company-ownership').value) || 0,
         founder: document.getElementById('edit-company-founder').value || null,
