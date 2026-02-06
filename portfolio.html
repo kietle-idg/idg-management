@@ -376,10 +376,11 @@
         return;
       }
 
-      // Only Admin and GP can add/edit companies and sync
-      if (role !== 'Admin' && role !== 'GP') {
+      // Only Admin and Team can add/edit companies; Admin can sync
+      if (role !== 'Admin' && role !== 'Team') {
         document.getElementById('add-company-btn').style.display = 'none';
-      } else {
+      }
+      if (role === 'Admin') {
         document.getElementById('sync-sheets-btn').style.display = 'inline-flex';
       }
 
@@ -473,7 +474,7 @@
       // Sort by valuation
       companies.sort((a, b) => (b.currentValuation || 0) - (a.currentValuation || 0));
 
-      const canEdit = Auth.currentUserData?.role === 'Admin' || Auth.currentUserData?.role === 'GP';
+      const canEdit = Auth.currentUserData?.role === 'Admin' || Auth.currentUserData?.role === 'Team';
       
       const html = companies.map(c => `
         <tr>
