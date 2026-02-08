@@ -58,6 +58,10 @@
             <p class="page-subtitle">All investments in IDGX Capital Fund I</p>
           </div>
           <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary" onclick="aiSync()" id="ai-sync-btn" style="display: none;">
+              <span style="margin-right: 4px;">🤖</span>
+              <span id="ai-sync-text">AI Sync</span>
+            </button>
             <button class="btn btn-secondary" onclick="syncFromSheets()" id="sync-sheets-btn" style="display: none;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8V3"></path>
@@ -382,6 +386,7 @@
       }
       if (role === 'Admin') {
         document.getElementById('sync-sheets-btn').style.display = 'inline-flex';
+        document.getElementById('ai-sync-btn').style.display = 'inline-flex';
       }
 
       // Load companies from Firebase
@@ -476,13 +481,22 @@
 
       const canEdit = Auth.currentUserData?.role === 'Admin' || Auth.currentUserData?.role === 'Team';
       
-      const html = companies.map(c => `
+      const html = companies.map(c => {
+        const hasDetails = c.description || c.aiUpdates?.length || c.aiHighlights?.length;
+        const updatesHtml = (c.aiUpdates || []).map(u => `<li style="margin-bottom: 4px;">${u}</li>`).join('');
+        const highlightsHtml = (c.aiHighlights || []).map(h => `<li style="margin-bottom: 4px;">${h}</li>`).join('');
+        const metricsHtml = c.aiKeyMetrics ? Object.entries(c.aiKeyMetrics).map(([k,v]) => `<span style="display:inline-block;background:var(--bg-secondary);padding:4px 10px;border-radius:6px;margin:2px 4px 2px 0;font-size:12px;"><strong>${k}:</strong> ${v}</span>`).join('') : '';
+
+        return `
         <tr>
           <td>
             <div class="company-cell">
               <div class="company-icon">${c.logo || c.name?.charAt(0)}</div>
               <div>
-                <div class="company-name">${c.name}</div>
+                <div class="company-name" style="cursor:pointer;" onclick="toggleDetail('${c.id}')">
+                  ${c.name}
+                  ${hasDetails ? '<span style="font-size:11px;color:var(--text-muted);margin-left:4px;">▸</span>' : ''}
+                </div>
                 <div class="company-sector">${c.sector}</div>
               </div>
             </div>
@@ -502,7 +516,44 @@
             ` : '-'}
           </td>
         </tr>
-      `).join('');
+        <tr class="detail-row" id="detail-${c.id}" style="display:none;">
+          <td colspan="10" style="padding:0;border-top:none;">
+            <div style="padding:20px 24px;background:var(--bg-secondary);border-bottom:2px solid var(--primary);">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+                <div>
+                  <h4 style="margin:0 0 8px;font-size:14px;color:var(--text-primary);">📋 About</h4>
+                  <p style="color:var(--text-secondary);line-height:1.6;font-size:13px;margin:0;">
+                    ${c.description || '<em style="color:var(--text-muted);">No description yet. Run AI Sync to extract info from documents.</em>'}
+                  </p>
+                  ${highlightsHtml ? `
+                    <h4 style="margin:16px 0 8px;font-size:14px;color:var(--text-primary);">⭐ Highlights</h4>
+                    <ul style="color:var(--text-secondary);padding-left:20px;font-size:13px;margin:0;">${highlightsHtml}</ul>
+                  ` : ''}
+                  ${metricsHtml ? `
+                    <h4 style="margin:16px 0 8px;font-size:14px;color:var(--text-primary);">📊 Key Metrics</h4>
+                    <div>${metricsHtml}</div>
+                  ` : ''}
+                </div>
+                <div>
+                  ${updatesHtml ? `
+                    <h4 style="margin:0 0 8px;font-size:14px;color:var(--text-primary);">📰 Latest Updates</h4>
+                    <ul style="color:var(--text-secondary);padding-left:20px;font-size:13px;margin:0;">${updatesHtml}</ul>
+                  ` : '<p style="color:var(--text-muted);font-size:13px;margin:0;"><em>No updates yet. Run AI Sync to extract from documents.</em></p>'}
+                  <div style="margin-top:16px;">
+                    ${c.founder ? `<p style="font-size:13px;margin:0 0 4px;"><strong>Founder:</strong> <span style="color:var(--text-secondary);">${c.founder}</span></p>` : ''}
+                    ${c.location ? `<p style="font-size:13px;margin:0 0 4px;"><strong>Location:</strong> <span style="color:var(--text-secondary);">${c.location}</span></p>` : ''}
+                    ${c.investors ? `<p style="font-size:13px;margin:0 0 4px;"><strong>Investors:</strong> <span style="color:var(--text-secondary);">${c.investors}</span></p>` : ''}
+                  </div>
+                  ${c.lastAiSync ? `
+                    <p style="margin-top:16px;font-size:11px;color:var(--text-muted);">🤖 Last AI sync: ${new Date(c.lastAiSync).toLocaleString()}</p>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+        `;
+      }).join('');
 
       document.getElementById('portfolio-table').innerHTML = html || '<tr><td colspan="10" class="text-center text-muted" style="padding: 48px;">No companies found</td></tr>';
     }
@@ -686,6 +737,7 @@
 
     async function saveCompanyEdit() {
       const companyId = document.getElementById('edit-company-id').value;
+      const company = companiesData.find(c => c.id === companyId);
       const name = document.getElementById('edit-company-name').value;
       const sector = document.getElementById('edit-company-sector').value;
 
@@ -698,6 +750,9 @@
       const entryValuation = parseInt(document.getElementById('edit-company-entry-valuation').value) || 0;
       const currentValuation = parseInt(document.getElementById('edit-company-valuation').value) || 0;
       const ownership = parseFloat(document.getElementById('edit-company-ownership').value) || 0;
+      const founder = document.getElementById('edit-company-founder').value || null;
+      const location = document.getElementById('edit-company-location').value || null;
+      const description = document.getElementById('edit-company-description').value || null;
 
       // Auto-calculate MOIC: current valuation / entry valuation
       let moic = 0;
@@ -711,6 +766,15 @@
         netValue = Math.round(investmentAmount * moic);
       }
 
+      // Track which fields user manually changed (so AI won't overwrite them)
+      const manualFields = new Set(company?.manualFields || []);
+      if (name !== (company?.name || '')) manualFields.add('name');
+      if (sector !== (company?.sector || '')) manualFields.add('sector');
+      if (document.getElementById('edit-company-stage').value !== (company?.stage || '')) manualFields.add('stage');
+      if (description !== (company?.description || '')) manualFields.add('description');
+      if (founder !== (company?.founder || '')) manualFields.add('founder');
+      if (location !== (company?.location || '')) manualFields.add('location');
+
       const companyData = {
         name,
         sector,
@@ -723,10 +787,11 @@
         ownership,
         netValue,
         moic,
-        founder: document.getElementById('edit-company-founder').value || null,
+        founder,
         founderEmail: document.getElementById('edit-company-founder-email').value || null,
-        location: document.getElementById('edit-company-location').value || null,
-        description: document.getElementById('edit-company-description').value || null
+        location,
+        description,
+        manualFields: [...manualFields]
       };
 
       const result = await Database.updateCompany(companyId, companyData);
@@ -757,6 +822,132 @@
         showToast('Company deleted successfully');
       } else {
         showToast('Error deleting company', true);
+      }
+    }
+
+    // Toggle company detail row
+    function toggleDetail(companyId) {
+      const row = document.getElementById('detail-' + companyId);
+      if (row) {
+        const isHidden = row.style.display === 'none';
+        row.style.display = isHidden ? 'table-row' : 'none';
+      }
+    }
+
+    // ========================
+    // AI SYNC FROM GOOGLE DRIVE
+    // ========================
+    async function aiSync() {
+      const btn = document.getElementById('ai-sync-btn');
+      const btnText = document.getElementById('ai-sync-text');
+      btn.disabled = true;
+      btnText.textContent = 'Loading folders...';
+
+      try {
+        // Step 1: Get list of company folders from Drive
+        const listRes = await fetch('/api/ai-sync?action=list');
+        const listData = await listRes.json();
+        
+        if (!listData.success || !listData.folders?.length) {
+          showToast('No folders found in Drive. Check GOOGLE_DRIVE_FOLDER_ID.', true);
+          return;
+        }
+
+        const totalFolders = listData.folders.length;
+        let processed = 0;
+        let updated = 0;
+        let created = 0;
+
+        // Step 2: Analyze each folder one at a time
+        for (const folder of listData.folders) {
+          processed++;
+          const cleanName = folder.name.replace(/^\d+[\.\)\-]\s*/, '').trim();
+          btnText.textContent = `🤖 ${processed}/${totalFolders}: ${cleanName}`;
+
+          try {
+            const analyzeRes = await fetch(`/api/ai-sync?action=analyze&folderId=${folder.id}&folderName=${encodeURIComponent(folder.name)}`);
+            const analyzeData = await analyzeRes.json();
+            
+            if (!analyzeData.success || !analyzeData.data) continue;
+
+            const aiData = analyzeData.data;
+
+            // Find existing company by name matching
+            const normalize = (n) => (n || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const folderNameNorm = normalize(cleanName);
+            
+            const existing = companiesData.find(c => {
+              const existingNorm = normalize(c.name);
+              return existingNorm === folderNameNorm ||
+                     existingNorm.includes(folderNameNorm) || 
+                     folderNameNorm.includes(existingNorm);
+            });
+
+            if (existing) {
+              // Smart merge: only update fields NOT manually edited
+              const manualFields = existing.manualFields || [];
+              const updateData = {};
+
+              if (!manualFields.includes('description') && aiData.description) {
+                updateData.description = aiData.description;
+              }
+              if (!manualFields.includes('sector') && aiData.sector) {
+                updateData.sector = aiData.sector;
+              }
+              if (!manualFields.includes('stage') && aiData.stage) {
+                updateData.stage = aiData.stage;
+              }
+              if (!manualFields.includes('founder') && aiData.founders?.length) {
+                updateData.founder = aiData.founders.join(', ');
+              }
+              if (!manualFields.includes('location') && aiData.location) {
+                updateData.location = aiData.location;
+              }
+
+              // Always update AI-specific fields (these are AI-only, never manually set)
+              if (aiData.latestUpdates?.length) updateData.aiUpdates = aiData.latestUpdates;
+              if (aiData.highlights?.length) updateData.aiHighlights = aiData.highlights;
+              if (aiData.keyMetrics) updateData.aiKeyMetrics = aiData.keyMetrics;
+              updateData.lastAiSync = new Date().toISOString();
+
+              if (Object.keys(updateData).length > 0) {
+                await Database.updateCompany(existing.id, updateData);
+                updated++;
+              }
+            } else {
+              // Create new company
+              await Database.createCompany({
+                name: cleanName,
+                description: aiData.description || null,
+                sector: aiData.sector || '-',
+                stage: aiData.stage || 'Seed',
+                status: 'Active',
+                founder: aiData.founders?.join(', ') || null,
+                location: aiData.location || null,
+                aiUpdates: aiData.latestUpdates || [],
+                aiHighlights: aiData.highlights || [],
+                aiKeyMetrics: aiData.keyMetrics || null,
+                lastAiSync: new Date().toISOString()
+              });
+              created++;
+            }
+          } catch (err) {
+            console.error(`Error analyzing ${folder.name}:`, err);
+          }
+        }
+
+        // Reload data
+        companiesData = await Database.getCompanies();
+        renderSummary();
+        renderTable();
+        showToast(`AI Sync complete! ${updated} updated, ${created} new companies from ${totalFolders} folders.`);
+
+      } catch (error) {
+        console.error('AI Sync error:', error);
+        showToast('AI Sync error: ' + error.message, true);
+      } finally {
+        btn.disabled = false;
+        btnText.textContent = 'AI Sync';
       }
     }
 
