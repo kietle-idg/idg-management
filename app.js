@@ -1,4 +1,4 @@
-// IDGX Capital - Simple Local Version
+// IDGX Capital Fund I - Simple Local Version
 // ====================================
 
 // Current user state (simulated)
