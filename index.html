@@ -67,8 +67,12 @@
           <!-- Metrics - Full view for GP -->
           <div id="metrics-full" class="metrics">
             <div class="metric">
-              <div class="metric-value" id="metric-aum">$0</div>
-              <div class="metric-label">Total AUM</div>
+              <div class="metric-value" id="metric-unrealized">$0</div>
+              <div class="metric-label">Unrealized Value</div>
+            </div>
+            <div class="metric">
+              <div class="metric-value" id="metric-realized">$0</div>
+              <div class="metric-label">Realized Value</div>
             </div>
             <div class="metric">
               <div class="metric-value positive" id="metric-moic">0x</div>
@@ -307,30 +311,54 @@
       return 'badge-default';
     }
 
-    // Same calculation logic as portfolio page
+    // Same calculation logic as portfolio page — handles Active / Partially Exited / Exited
     function getCompanyMoic(c) {
+      if (c.status === 'Exited') {
+        if (c.exitProceeds > 0 && c.investmentAmount > 0) return c.exitProceeds / c.investmentAmount;
+        return 0;
+      }
+      if (c.status === 'Partially Exited') {
+        const baseMoic = (c.currentValuation > 0 && c.entryValuation > 0) ? c.currentValuation / c.entryValuation : (c.moic || 0);
+        const unrealized = (c.remainingCostBasis || 0) * baseMoic;
+        const total = (c.amountRealized || 0) + unrealized;
+        if (c.investmentAmount > 0) return total / c.investmentAmount;
+        return 0;
+      }
       if (c.currentValuation > 0 && c.entryValuation > 0) return c.currentValuation / c.entryValuation;
       if (c.moic && c.moic > 0) return c.moic;
       return 0;
     }
 
-    function getCompanyNetValue(c) {
+    function getCompanyUnrealized(c) {
+      if (c.status === 'Exited') return 0;
+      if (c.status === 'Partially Exited') {
+        const baseMoic = (c.currentValuation > 0 && c.entryValuation > 0) ? c.currentValuation / c.entryValuation : (c.moic || 0);
+        return Math.round((c.remainingCostBasis || 0) * (baseMoic > 0 ? baseMoic : 1));
+      }
       const moic = getCompanyMoic(c);
       if (moic > 0 && c.investmentAmount > 0) return Math.round(c.investmentAmount * moic);
       return 0;
     }
 
+    function getCompanyRealized(c) {
+      if (c.status === 'Exited') return c.exitProceeds || 0;
+      if (c.status === 'Partially Exited') return c.amountRealized || 0;
+      return 0;
+    }
+
+    function getCompanyNetValue(c) {
+      return getCompanyUnrealized(c) + getCompanyRealized(c);
+    }
+
     function renderMetrics() {
-      // AUM = sum of net values (Invested × MOIC for each company)
-      const aum = companiesData.reduce((sum, c) => sum + getCompanyNetValue(c), 0);
-      
-      // Total invested
+      const unrealized = companiesData.reduce((sum, c) => sum + getCompanyUnrealized(c), 0);
+      const realized = companiesData.reduce((sum, c) => sum + getCompanyRealized(c), 0);
+      const totalValue = unrealized + realized;
       const totalInvested = companiesData.reduce((sum, c) => sum + (c.investmentAmount || 0), 0);
+      const moic = totalInvested > 0 ? totalValue / totalInvested : 0;
       
-      // Portfolio MOIC = total net value / total invested
-      const moic = totalInvested > 0 ? aum / totalInvested : 0;
-      
-      document.getElementById('metric-aum').textContent = formatCurrency(aum);
+      document.getElementById('metric-unrealized').textContent = formatCurrency(unrealized);
+      document.getElementById('metric-realized').textContent = formatCurrency(realized);
       document.getElementById('metric-moic').textContent = moic.toFixed(2) + 'x';
       document.getElementById('metric-companies').textContent = companiesData.length;
       
@@ -353,7 +381,7 @@
 
     function renderTopCompanies() {
       const top = companiesData
-        .filter(c => c.status === 'Active')
+        .filter(c => c.status === 'Active' || c.status === 'Partially Exited')
         .sort((a, b) => getCompanyNetValue(b) - getCompanyNetValue(a))
         .slice(0, 5);
 

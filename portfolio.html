@@ -100,8 +100,12 @@
               <div class="metric-label">Total Invested</div>
             </div>
             <div class="metric">
-              <div class="metric-value" id="total-value">$0</div>
-              <div class="metric-label">Current Value</div>
+              <div class="metric-value" id="unrealized-value">$0</div>
+              <div class="metric-label">Unrealized Value</div>
+            </div>
+            <div class="metric">
+              <div class="metric-value" id="realized-value">$0</div>
+              <div class="metric-label">Realized Value</div>
             </div>
           </div>
 
@@ -112,6 +116,7 @@
                 <div class="filters">
                   <button class="filter-btn active" data-filter="all">All</button>
                   <button class="filter-btn" data-filter="active">Active</button>
+                  <button class="filter-btn" data-filter="partial">Partially Exited</button>
                   <button class="filter-btn" data-filter="exited">Exited</button>
                 </div>
                 <div class="search-box" style="min-width: 280px;">
@@ -203,8 +208,9 @@
               </div>
               <div class="form-group">
                 <label class="form-label">Status *</label>
-                <select class="form-input form-select" id="company-status" required>
+                <select class="form-input form-select" id="company-status" required onchange="toggleAddExitFields()">
                   <option value="Active">Active</option>
+                  <option value="Partially Exited">Partially Exited</option>
                   <option value="Exited">Exited</option>
                 </select>
               </div>
@@ -226,7 +232,40 @@
               </div>
               <div class="form-group">
                 <label class="form-label">Ownership (%)</label>
-                <input type="number" step="0.1" class="form-input" id="company-ownership" placeholder="15.5">
+                <input type="number" step="0.001" class="form-input" id="company-ownership" placeholder="15.5">
+              </div>
+              <!-- Exit fields (shown/hidden by JS) -->
+              <div id="add-exit-fields" style="display:none;grid-column:span 2;">
+                <div class="grid-2">
+                  <div class="form-group" id="add-exit-date-group">
+                    <label class="form-label">Exit Date</label>
+                    <input type="date" class="form-input" id="company-exit-date">
+                  </div>
+                  <div class="form-group" id="add-exit-proceeds-group">
+                    <label class="form-label">Exit Proceeds ($)</label>
+                    <input type="number" class="form-input" id="company-exit-proceeds" placeholder="Total cash received">
+                  </div>
+                </div>
+              </div>
+              <div id="add-partial-exit-fields" style="display:none;grid-column:span 2;">
+                <div class="grid-2">
+                  <div class="form-group">
+                    <label class="form-label">Partial Exit Date</label>
+                    <input type="date" class="form-input" id="company-partial-exit-date">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Amount Realized ($)</label>
+                    <input type="number" class="form-input" id="company-amount-realized" placeholder="Cash received from partial sales">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Remaining Ownership (%)</label>
+                    <input type="number" step="0.001" class="form-input" id="company-remaining-ownership" placeholder="Ownership still held">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Remaining Cost Basis ($)</label>
+                    <input type="number" class="form-input" id="company-remaining-cost-basis" placeholder="Cost basis of remaining position">
+                  </div>
+                </div>
               </div>
               <div class="form-group">
                 <label class="form-label">Founder Name</label>
@@ -285,8 +324,9 @@
             </div>
             <div class="form-group">
               <label class="form-label">Status *</label>
-              <select class="form-input form-select" id="edit-company-status" required>
+              <select class="form-input form-select" id="edit-company-status" required onchange="toggleEditExitFields()">
                 <option value="Active">Active</option>
+                <option value="Partially Exited">Partially Exited</option>
                 <option value="Exited">Exited</option>
               </select>
             </div>
@@ -309,6 +349,39 @@
             <div class="form-group">
               <label class="form-label">Ownership (%)</label>
               <input type="number" step="0.001" class="form-input" id="edit-company-ownership">
+            </div>
+            <!-- Exit fields (shown/hidden by JS) -->
+            <div id="edit-exit-fields" style="display:none;grid-column:span 2;">
+              <div class="grid-2">
+                <div class="form-group">
+                  <label class="form-label">Exit Date</label>
+                  <input type="date" class="form-input" id="edit-company-exit-date">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Exit Proceeds ($)</label>
+                  <input type="number" class="form-input" id="edit-company-exit-proceeds" placeholder="Total cash received">
+                </div>
+              </div>
+            </div>
+            <div id="edit-partial-exit-fields" style="display:none;grid-column:span 2;">
+              <div class="grid-2">
+                <div class="form-group">
+                  <label class="form-label">Partial Exit Date</label>
+                  <input type="date" class="form-input" id="edit-company-partial-exit-date">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Amount Realized ($)</label>
+                  <input type="number" class="form-input" id="edit-company-amount-realized" placeholder="Cash received from partial sales">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Remaining Ownership (%)</label>
+                  <input type="number" step="0.001" class="form-input" id="edit-company-remaining-ownership" placeholder="Ownership still held">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Remaining Cost Basis ($)</label>
+                  <input type="number" class="form-input" id="edit-company-remaining-cost-basis" placeholder="Cost basis of remaining position">
+                </div>
+              </div>
             </div>
             <div class="form-group">
               <label class="form-label">Founder Name</label>
@@ -410,17 +483,46 @@
     }
 
     function getMoic(c) {
-      // Always calculate from page data: current valuation / entry valuation
+      if (c.status === 'Exited') {
+        // Exited: MOIC = exit proceeds / investment amount
+        if (c.exitProceeds > 0 && c.investmentAmount > 0) return c.exitProceeds / c.investmentAmount;
+        return 0;
+      }
+      if (c.status === 'Partially Exited') {
+        // Partially Exited: MOIC = (amountRealized + unrealized remaining) / investmentAmount
+        const baseMoic = (c.currentValuation > 0 && c.entryValuation > 0) ? c.currentValuation / c.entryValuation : (c.moic || 0);
+        const unrealized = (c.remainingCostBasis || 0) * baseMoic;
+        const total = (c.amountRealized || 0) + unrealized;
+        if (c.investmentAmount > 0) return total / c.investmentAmount;
+        return 0;
+      }
+      // Active: current valuation / entry valuation
       if (c.currentValuation > 0 && c.entryValuation > 0) return c.currentValuation / c.entryValuation;
-      // Fallback: stored moic from sheet
       if (c.moic && c.moic > 0) return c.moic;
       return 0;
     }
 
-    function getNetValue(c) {
+    function getUnrealizedValue(c) {
+      if (c.status === 'Exited') return 0;
+      if (c.status === 'Partially Exited') {
+        // Unrealized = remainingCostBasis × valuation MOIC
+        const baseMoic = (c.currentValuation > 0 && c.entryValuation > 0) ? c.currentValuation / c.entryValuation : (c.moic || 0);
+        return Math.round((c.remainingCostBasis || 0) * (baseMoic > 0 ? baseMoic : 1));
+      }
+      // Active: invested × MOIC
       const moic = getMoic(c);
       if (moic > 0 && c.investmentAmount > 0) return Math.round(c.investmentAmount * moic);
       return 0;
+    }
+
+    function getRealizedValue(c) {
+      if (c.status === 'Exited') return c.exitProceeds || 0;
+      if (c.status === 'Partially Exited') return c.amountRealized || 0;
+      return 0;
+    }
+
+    function getNetValue(c) {
+      return getUnrealizedValue(c) + getRealizedValue(c);
     }
 
     function formatMoic(c) {
@@ -434,6 +536,12 @@
       return moic >= 1 ? 'var(--success)' : 'var(--danger)';
     }
 
+    function getStatusBadgeClass(status) {
+      if (status === 'Active') return 'badge-success';
+      if (status === 'Partially Exited') return 'badge-warning';
+      return 'badge-default';
+    }
+
     function getStageBadgeClass(stage) {
       if (stage === 'Seed') return 'badge-warning';
       if (stage === 'Series A') return 'badge-success';
@@ -445,15 +553,16 @@
     function renderSummary() {
       let companies = companiesData;
 
-      const active = companies.filter(c => c.status === 'Active');
+      const active = companies.filter(c => c.status === 'Active' || c.status === 'Partially Exited');
       const totalInvested = companies.reduce((sum, c) => sum + (c.investmentAmount || 0), 0);
-      // Current Value = sum of net values
-      const totalValue = companies.reduce((sum, c) => sum + getNetValue(c), 0);
+      const unrealized = companies.reduce((sum, c) => sum + getUnrealizedValue(c), 0);
+      const realized = companies.reduce((sum, c) => sum + getRealizedValue(c), 0);
 
       document.getElementById('total-companies').textContent = companies.length;
       document.getElementById('active-companies').textContent = active.length;
       document.getElementById('total-invested').textContent = formatCurrency(totalInvested);
-      document.getElementById('total-value').textContent = formatCurrency(totalValue);
+      document.getElementById('unrealized-value').textContent = formatCurrency(unrealized);
+      document.getElementById('realized-value').textContent = formatCurrency(realized);
     }
 
     function renderTable() {
@@ -462,6 +571,8 @@
       // Apply filter
       if (currentFilter === 'active') {
         companies = companies.filter(c => c.status === 'Active');
+      } else if (currentFilter === 'partial') {
+        companies = companies.filter(c => c.status === 'Partially Exited');
       } else if (currentFilter === 'exited') {
         companies = companies.filter(c => c.status === 'Exited');
       }
@@ -506,9 +617,12 @@
           <td class="text-right value">${formatCurrency(c.entryValuation)}</td>
           <td class="text-right value">${formatCurrency(c.currentValuation)}</td>
           <td class="text-right">${(c.ownership || 0).toFixed(3)}%</td>
-          <td class="text-right value">${formatCurrency(getNetValue(c))}</td>
+          <td class="text-right value">
+            ${formatCurrency(getUnrealizedValue(c))}
+            ${getRealizedValue(c) > 0 ? `<div style="font-size:11px;color:var(--text-muted);">(+${formatCurrency(getRealizedValue(c))} realized)</div>` : ''}
+          </td>
           <td class="text-right" style="font-weight: 600; color: ${getMoicColor(c)};">${formatMoic(c)}</td>
-          <td><span class="badge ${c.status === 'Active' ? 'badge-success' : 'badge-default'}">${c.status}</span></td>
+          <td><span class="badge ${getStatusBadgeClass(c.status)}">${c.status}</span></td>
           <td class="text-right">
             ${canEdit ? `
               <button class="btn btn-ghost btn-sm" onclick="editCompany('${c.id}')">Edit</button>
@@ -668,6 +782,20 @@
       document.getElementById('add-company-modal').classList.remove('visible');
     }
 
+    // Toggle exit fields in Add modal
+    function toggleAddExitFields() {
+      const status = document.getElementById('company-status').value;
+      document.getElementById('add-exit-fields').style.display = status === 'Exited' ? 'block' : 'none';
+      document.getElementById('add-partial-exit-fields').style.display = status === 'Partially Exited' ? 'block' : 'none';
+    }
+
+    // Toggle exit fields in Edit modal
+    function toggleEditExitFields() {
+      const status = document.getElementById('edit-company-status').value;
+      document.getElementById('edit-exit-fields').style.display = status === 'Exited' ? 'block' : 'none';
+      document.getElementById('edit-partial-exit-fields').style.display = status === 'Partially Exited' ? 'block' : 'none';
+    }
+
     async function addCompany() {
       const name = document.getElementById('company-name').value;
       const sector = document.getElementById('company-sector').value;
@@ -679,21 +807,45 @@
         return;
       }
 
+      const investmentAmount = parseInt(document.getElementById('company-investment').value) || 0;
+      const entryValuation = parseInt(document.getElementById('company-entry-valuation').value) || 0;
+      const currentValuation = parseInt(document.getElementById('company-valuation').value) || 0;
+
       const companyData = {
         name,
         sector,
         stage,
         status,
         investmentDate: document.getElementById('company-date').value || null,
-        investmentAmount: parseInt(document.getElementById('company-investment').value) || 0,
-        entryValuation: parseInt(document.getElementById('company-entry-valuation').value) || 0,
-        currentValuation: parseInt(document.getElementById('company-valuation').value) || 0,
+        investmentAmount,
+        entryValuation,
+        currentValuation,
         ownership: parseFloat(document.getElementById('company-ownership').value) || 0,
         founder: document.getElementById('company-founder').value || null,
         founderEmail: document.getElementById('company-founder-email').value || null,
         location: document.getElementById('company-location').value || null,
         description: document.getElementById('company-description').value || null
       };
+
+      // Exit fields
+      if (status === 'Exited') {
+        companyData.exitDate = document.getElementById('company-exit-date').value || null;
+        companyData.exitProceeds = parseInt(document.getElementById('company-exit-proceeds').value) || 0;
+        if (companyData.exitProceeds > 0 && investmentAmount > 0) {
+          companyData.moic = companyData.exitProceeds / investmentAmount;
+        }
+      } else if (status === 'Partially Exited') {
+        companyData.partialExitDate = document.getElementById('company-partial-exit-date').value || null;
+        companyData.amountRealized = parseInt(document.getElementById('company-amount-realized').value) || 0;
+        companyData.remainingOwnership = parseFloat(document.getElementById('company-remaining-ownership').value) || 0;
+        companyData.remainingCostBasis = parseInt(document.getElementById('company-remaining-cost-basis').value) || 0;
+      }
+
+      // Auto-calculate MOIC for active
+      if (status === 'Active' && currentValuation > 0 && entryValuation > 0) {
+        companyData.moic = currentValuation / entryValuation;
+        companyData.netValue = Math.round(investmentAmount * companyData.moic);
+      }
 
       const result = await Database.createCompany(companyData);
       
@@ -728,6 +880,17 @@
       document.getElementById('edit-company-location').value = company.location || '';
       document.getElementById('edit-company-description').value = company.description || '';
 
+      // Populate exit fields
+      document.getElementById('edit-company-exit-date').value = company.exitDate || '';
+      document.getElementById('edit-company-exit-proceeds').value = company.exitProceeds || '';
+      document.getElementById('edit-company-partial-exit-date').value = company.partialExitDate || '';
+      document.getElementById('edit-company-amount-realized').value = company.amountRealized || '';
+      document.getElementById('edit-company-remaining-ownership').value = company.remainingOwnership || '';
+      document.getElementById('edit-company-remaining-cost-basis').value = company.remainingCostBasis || '';
+
+      // Show/hide exit fields based on status
+      toggleEditExitFields();
+
       document.getElementById('edit-company-modal').classList.add('visible');
     }
 
@@ -740,6 +903,7 @@
       const company = companiesData.find(c => c.id === companyId);
       const name = document.getElementById('edit-company-name').value;
       const sector = document.getElementById('edit-company-sector').value;
+      const status = document.getElementById('edit-company-status').value;
 
       if (!name || !sector) {
         showToast('Company name and sector are required', true);
@@ -754,16 +918,25 @@
       const location = document.getElementById('edit-company-location').value || null;
       const description = document.getElementById('edit-company-description').value || null;
 
-      // Auto-calculate MOIC: current valuation / entry valuation
+      // Auto-calculate MOIC based on status
       let moic = 0;
-      if (currentValuation > 0 && entryValuation > 0) {
-        moic = currentValuation / entryValuation;
-      }
-
-      // Auto-calculate Net Value: investment × MOIC
       let netValue = 0;
-      if (moic > 0 && investmentAmount > 0) {
-        netValue = Math.round(investmentAmount * moic);
+
+      if (status === 'Exited') {
+        const exitProceeds = parseInt(document.getElementById('edit-company-exit-proceeds').value) || 0;
+        if (exitProceeds > 0 && investmentAmount > 0) moic = exitProceeds / investmentAmount;
+        netValue = exitProceeds;
+      } else if (status === 'Partially Exited') {
+        const amountRealized = parseInt(document.getElementById('edit-company-amount-realized').value) || 0;
+        const remainingCostBasis = parseInt(document.getElementById('edit-company-remaining-cost-basis').value) || 0;
+        const baseMoic = (currentValuation > 0 && entryValuation > 0) ? currentValuation / entryValuation : 0;
+        const unrealized = remainingCostBasis * (baseMoic > 0 ? baseMoic : 1);
+        if (investmentAmount > 0) moic = (amountRealized + unrealized) / investmentAmount;
+        netValue = Math.round(amountRealized + unrealized);
+      } else {
+        // Active
+        if (currentValuation > 0 && entryValuation > 0) moic = currentValuation / entryValuation;
+        if (moic > 0 && investmentAmount > 0) netValue = Math.round(investmentAmount * moic);
       }
 
       // Track which fields user manually changed (so AI won't overwrite them)
@@ -779,7 +952,7 @@
         name,
         sector,
         stage: document.getElementById('edit-company-stage').value,
-        status: document.getElementById('edit-company-status').value,
+        status,
         investmentDate: document.getElementById('edit-company-date').value || null,
         investmentAmount,
         entryValuation,
@@ -793,6 +966,33 @@
         description,
         manualFields: [...manualFields]
       };
+
+      // Add exit-specific fields
+      if (status === 'Exited') {
+        companyData.exitDate = document.getElementById('edit-company-exit-date').value || null;
+        companyData.exitProceeds = parseInt(document.getElementById('edit-company-exit-proceeds').value) || 0;
+        // Clear partial exit fields
+        companyData.partialExitDate = null;
+        companyData.amountRealized = 0;
+        companyData.remainingOwnership = 0;
+        companyData.remainingCostBasis = 0;
+      } else if (status === 'Partially Exited') {
+        companyData.partialExitDate = document.getElementById('edit-company-partial-exit-date').value || null;
+        companyData.amountRealized = parseInt(document.getElementById('edit-company-amount-realized').value) || 0;
+        companyData.remainingOwnership = parseFloat(document.getElementById('edit-company-remaining-ownership').value) || 0;
+        companyData.remainingCostBasis = parseInt(document.getElementById('edit-company-remaining-cost-basis').value) || 0;
+        // Clear full exit fields
+        companyData.exitDate = null;
+        companyData.exitProceeds = 0;
+      } else {
+        // Active — clear all exit fields
+        companyData.exitDate = null;
+        companyData.exitProceeds = 0;
+        companyData.partialExitDate = null;
+        companyData.amountRealized = 0;
+        companyData.remainingOwnership = 0;
+        companyData.remainingCostBasis = 0;
+      }
 
       const result = await Database.updateCompany(companyId, companyData);
       
