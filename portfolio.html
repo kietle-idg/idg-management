@@ -835,6 +835,45 @@
     }
 
     // ========================
+    // SMART COMPANY NAME MATCHING
+    // ========================
+    function findMatchingCompany(folderName, companies) {
+      const strip = (n) => (n || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+      const folderStrip = strip(folderName);
+      const folderWords = folderStrip.split(/\s+/).filter(w => w.length >= 3);
+      const folderFirstWord = folderStrip.split(/\s+/)[0] || '';
+
+      let bestMatch = null;
+      let bestScore = 0;
+
+      for (const c of companies) {
+        const nameStrip = strip(c.name);
+        const nameWords = nameStrip.split(/\s+/).filter(w => w.length >= 3);
+        const nameFirstWord = nameStrip.split(/\s+/)[0] || '';
+        let score = 0;
+
+        // Exact match after stripping
+        if (nameStrip === folderStrip) { score = 100; }
+        // One contains the other fully
+        else if (nameStrip.includes(folderStrip) || folderStrip.includes(nameStrip)) { score = 80; }
+        // First word matches (e.g. "Aggregata" in both)
+        else if (folderFirstWord.length >= 3 && folderFirstWord === nameFirstWord) { score = 70; }
+        // Any significant word from folder appears in company name
+        else if (folderWords.some(w => nameStrip.includes(w))) { score = 50; }
+        // Any significant word from company name appears in folder
+        else if (nameWords.some(w => folderStrip.includes(w))) { score = 50; }
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = c;
+        }
+      }
+
+      // Only return if we have a reasonable match (score >= 50)
+      return bestScore >= 50 ? bestMatch : null;
+    }
+
+    // ========================
     // AI SYNC FROM GOOGLE DRIVE
     // ========================
     async function aiSync() {
@@ -872,16 +911,8 @@
 
             const aiData = analyzeData.data;
 
-            // Find existing company by name matching
-            const normalize = (n) => (n || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-            const folderNameNorm = normalize(cleanName);
-            
-            const existing = companiesData.find(c => {
-              const existingNorm = normalize(c.name);
-              return existingNorm === folderNameNorm ||
-                     existingNorm.includes(folderNameNorm) || 
-                     folderNameNorm.includes(existingNorm);
-            });
+            // Smart company matching — handles "Aggregata (Gata)" vs "Aggregata (renamed as Gata)" etc.
+            const existing = findMatchingCompany(cleanName, companiesData);
 
             if (existing) {
               // Smart merge: only update fields NOT manually edited
@@ -930,6 +961,8 @@
                 lastAiSync: new Date().toISOString()
               });
               created++;
+              // Reload so next folders can match this new company (avoid duplicates)
+              companiesData = await Database.getCompanies();
             }
           } catch (err) {
             console.error(`Error analyzing ${folder.name}:`, err);
@@ -978,17 +1011,8 @@
         let created = 0;
 
         for (const sheetCompany of data.companies) {
-          // Normalize name for matching
-          const normalize = (n) => (n || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          const sheetNameNorm = normalize(sheetCompany.name);
-
-          // Find existing company by name
-          const existing = companiesData.find(c => {
-            const existingNorm = normalize(c.name);
-            return existingNorm === sheetNameNorm || 
-                   existingNorm.includes(sheetNameNorm) || 
-                   sheetNameNorm.includes(existingNorm);
-          });
+          // Smart matching (same logic as AI sync)
+          const existing = findMatchingCompany(sheetCompany.name, companiesData);
 
           // Build update data from the sheet (only update financial fields)
           const updateData = {};
