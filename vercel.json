@@ -5,6 +5,14 @@
     { "source": "/api/calendar-events", "destination": "/api/calendar-events.js" },
     { "source": "/api/ai-sync", "destination": "/api/ai-sync.js" }
   ],
+  "headers": [
+    {
+      "source": "/(.*).html",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+      ]
+    }
+  ],
   "functions": {
     "api/*.js": {
       "memory": 1024,
