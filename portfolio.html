@@ -97,7 +97,7 @@
             </div>
             <div class="metric">
               <div class="metric-value" id="total-invested">$0</div>
-              <div class="metric-label">Total Invested</div>
+              <div class="metric-label">Capital Deployed</div>
             </div>
             <div class="metric">
               <div class="metric-value" id="unrealized-value">$0</div>
@@ -106,6 +106,10 @@
             <div class="metric">
               <div class="metric-value" id="realized-value">$0</div>
               <div class="metric-label">Realized Value</div>
+            </div>
+            <div class="metric">
+              <div class="metric-value positive" id="fund-moic">0x</div>
+              <div class="metric-label">Fund MOIC (TVPI)</div>
             </div>
           </div>
 
@@ -424,6 +428,7 @@
     let currentFilter = 'all';
     let currentSearch = '';
     let companiesData = [];
+    let fundData = null;
 
     async function init() {
       // Check authentication
@@ -462,8 +467,9 @@
         document.getElementById('ai-sync-btn').style.display = 'inline-flex';
       }
 
-      // Load companies from Firebase
+      // Load companies and fund data from Firebase
       companiesData = await Database.getCompanies();
+      fundData = await Database.getFund();
 
       renderSummary();
       renderTable();
@@ -554,15 +560,23 @@
       let companies = companiesData;
 
       const active = companies.filter(c => c.status === 'Active' || c.status === 'Partially Exited');
-      const totalInvested = companies.reduce((sum, c) => sum + (c.investmentAmount || 0), 0);
+      // Only count Active + Partially Exited (exited capital was recycled/redeployed)
+      const totalInvested = companies
+        .filter(c => c.status === 'Active' || c.status === 'Partially Exited')
+        .reduce((sum, c) => sum + (c.investmentAmount || 0), 0);
       const unrealized = companies.reduce((sum, c) => sum + getUnrealizedValue(c), 0);
       const realized = companies.reduce((sum, c) => sum + getRealizedValue(c), 0);
+      // TVPI: use fund size as denominator (accounts for recycled/redeployed capital)
+      const fundSize = fundData?.fundSize || 0;
+      const totalValue = unrealized + realized;
+      const moic = fundSize > 0 ? totalValue / fundSize : 0;
 
       document.getElementById('total-companies').textContent = companies.length;
       document.getElementById('active-companies').textContent = active.length;
       document.getElementById('total-invested').textContent = formatCurrency(totalInvested);
       document.getElementById('unrealized-value').textContent = formatCurrency(unrealized);
       document.getElementById('realized-value').textContent = formatCurrency(realized);
+      document.getElementById('fund-moic').textContent = moic.toFixed(2) + 'x';
     }
 
     function renderTable() {
