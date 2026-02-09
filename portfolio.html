@@ -566,10 +566,9 @@
         .reduce((sum, c) => sum + (c.investmentAmount || 0), 0);
       const unrealized = companies.reduce((sum, c) => sum + getUnrealizedValue(c), 0);
       const realized = companies.reduce((sum, c) => sum + getRealizedValue(c), 0);
-      // TVPI: use paid-in capital as denominator (capital actually called from LPs)
-      const paidIn = fundData?.paidInCapital || 0;
+      // MOIC denominator = capital deployed (Active + Partially Exited only, excludes recycled)
       const totalValue = unrealized + realized;
-      const moic = paidIn > 0 ? totalValue / paidIn : 0;
+      const moic = totalInvested > 0 ? totalValue / totalInvested : 0;
 
       document.getElementById('total-companies').textContent = companies.length;
       document.getElementById('active-companies').textContent = active.length;

@@ -354,9 +354,11 @@
       const unrealized = companiesData.reduce((sum, c) => sum + getCompanyUnrealized(c), 0);
       const realized = companiesData.reduce((sum, c) => sum + getCompanyRealized(c), 0);
       const totalValue = unrealized + realized;
-      // TVPI: use paid-in capital as denominator (capital actually called from LPs)
-      const paidIn = fundData?.paidInCapital || 0;
-      const moic = paidIn > 0 ? totalValue / paidIn : 0;
+      // MOIC denominator = capital deployed (Active + Partially Exited only, excludes recycled)
+      const deployed = companiesData
+        .filter(c => c.status === 'Active' || c.status === 'Partially Exited')
+        .reduce((sum, c) => sum + (c.investmentAmount || 0), 0);
+      const moic = deployed > 0 ? totalValue / deployed : 0;
       
       document.getElementById('metric-unrealized').textContent = formatCurrency(unrealized);
       document.getElementById('metric-realized').textContent = formatCurrency(realized);
@@ -372,7 +374,7 @@
       const deployed = companiesData
         .filter(c => c.status === 'Active' || c.status === 'Partially Exited')
         .reduce((sum, c) => sum + (c.investmentAmount || 0), 0);
-      const total = fundData?.paidInCapital || fundData?.fundSize || deployed || 1;
+      const total = fundData?.fundSize || deployed || 1;
       const remaining = Math.max(0, total - deployed);
       const percent = Math.min(100, ((deployed / total) * 100)).toFixed(0);
       
