@@ -62,6 +62,10 @@
               <span style="margin-right: 4px;">🤖</span>
               <span id="ai-sync-text">AI Sync</span>
             </button>
+            <button class="btn btn-secondary" onclick="refreshCryptoPrices()" id="crypto-prices-btn" style="display: none;">
+              <span style="margin-right: 4px;">📈</span>
+              <span id="crypto-prices-text">Refresh Crypto Prices</span>
+            </button>
             <button class="btn btn-secondary" onclick="syncFromSheets()" id="sync-sheets-btn" style="display: none;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8V3"></path>
@@ -238,6 +242,10 @@
                 <label class="form-label">Ownership (%)</label>
                 <input type="number" step="0.001" class="form-input" id="company-ownership" placeholder="15.5">
               </div>
+              <div class="form-group">
+                <label class="form-label">CoinGecko ID</label>
+                <input type="text" class="form-input" id="company-coingecko-id" placeholder="e.g. bitcoin, sei-network">
+              </div>
               <!-- Exit fields (shown/hidden by JS) -->
               <div id="add-exit-fields" style="display:none;grid-column:span 2;">
                 <div class="grid-2">
@@ -354,6 +362,10 @@
               <label class="form-label">Ownership (%)</label>
               <input type="number" step="0.001" class="form-input" id="edit-company-ownership">
             </div>
+            <div class="form-group">
+              <label class="form-label">CoinGecko ID</label>
+              <input type="text" class="form-input" id="edit-company-coingecko-id" placeholder="e.g. bitcoin, sei-network">
+            </div>
             <!-- Exit fields (shown/hidden by JS) -->
             <div id="edit-exit-fields" style="display:none;grid-column:span 2;">
               <div class="grid-2">
@@ -466,6 +478,9 @@
       if (role === 'Admin') {
         document.getElementById('sync-sheets-btn').style.display = 'inline-flex';
         document.getElementById('ai-sync-btn').style.display = 'inline-flex';
+      }
+      if (role === 'Admin' || role === 'Team') {
+        document.getElementById('crypto-prices-btn').style.display = 'inline-flex';
       }
 
       // Load companies and fund data from Firebase
@@ -620,9 +635,10 @@
               <div>
                 <div class="company-name" style="cursor:pointer;" onclick="toggleDetail('${c.id}')">
                   ${c.name}
+                  ${c.coingeckoId ? '<span style="display:inline-block;background:var(--accent-light);color:var(--accent);font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;">LISTED</span>' : ''}
                   ${hasDetails ? '<span style="font-size:11px;color:var(--text-muted);margin-left:4px;">▸</span>' : ''}
                 </div>
-                <div class="company-sector">${c.sector}</div>
+                <div class="company-sector">${c.sector}${c.coingeckoId && c.tokenPrice ? ` · $${c.tokenPrice < 0.01 ? c.tokenPrice.toFixed(6) : c.tokenPrice < 1 ? c.tokenPrice.toFixed(4) : c.tokenPrice.toFixed(2)}` : ''}${c.coingeckoId && c.priceChange24h != null ? ` <span style="color:${c.priceChange24h >= 0 ? 'var(--success)' : 'var(--danger)'};font-size:11px;">${c.priceChange24h >= 0 ? '+' : ''}${c.priceChange24h.toFixed(1)}%</span>` : ''}</div>
               </div>
             </div>
           </td>
@@ -838,7 +854,8 @@
         founder: document.getElementById('company-founder').value || null,
         founderEmail: document.getElementById('company-founder-email').value || null,
         location: document.getElementById('company-location').value || null,
-        description: document.getElementById('company-description').value || null
+        description: document.getElementById('company-description').value || null,
+        coingeckoId: document.getElementById('company-coingecko-id').value.trim().toLowerCase() || null
       };
 
       // Exit fields
@@ -893,6 +910,7 @@
       document.getElementById('edit-company-founder-email').value = company.founderEmail || '';
       document.getElementById('edit-company-location').value = company.location || '';
       document.getElementById('edit-company-description').value = company.description || '';
+      document.getElementById('edit-company-coingecko-id').value = company.coingeckoId || '';
 
       // Populate exit fields
       document.getElementById('edit-company-exit-date').value = company.exitDate || '';
@@ -978,6 +996,7 @@
         founderEmail: document.getElementById('edit-company-founder-email').value || null,
         location,
         description,
+        coingeckoId: document.getElementById('edit-company-coingecko-id').value.trim().toLowerCase() || null,
         manualFields: [...manualFields]
       };
 
@@ -1269,6 +1288,88 @@
       } finally {
         btn.disabled = false;
         btnText.textContent = 'Sync from Sheets';
+      }
+    }
+
+    // ========================
+    // REFRESH CRYPTO PRICES (CoinGecko FDV)
+    // ========================
+    async function refreshCryptoPrices() {
+      const btn = document.getElementById('crypto-prices-btn');
+      const btnText = document.getElementById('crypto-prices-text');
+      
+      // Find companies with coingeckoId set
+      const cryptoCompanies = companiesData.filter(c => c.coingeckoId);
+      
+      if (cryptoCompanies.length === 0) {
+        showToast('No companies have a CoinGecko ID set. Edit a company to add one.', true);
+        return;
+      }
+
+      btn.disabled = true;
+      btnText.textContent = 'Fetching prices...';
+
+      try {
+        const ids = cryptoCompanies.map(c => c.coingeckoId);
+        
+        const response = await fetch('/api/crypto-prices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids })
+        });
+
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to fetch prices');
+        }
+
+        let updatedCount = 0;
+
+        for (const price of data.prices) {
+          // Find matching company by coingeckoId
+          const company = cryptoCompanies.find(c => c.coingeckoId === price.id);
+          if (!company) continue;
+
+          const fdv = price.fullyDilutedValuation;
+          if (!fdv || fdv <= 0) continue;
+
+          // Update company in Firestore
+          const updateData = {
+            currentValuation: Math.round(fdv),
+            tokenPrice: price.currentPrice || null,
+            marketCap: price.marketCap || null,
+            priceChange24h: price.priceChange24h || null,
+            cryptoPriceUpdatedAt: new Date().toISOString()
+          };
+
+          // Auto-recalculate MOIC and Net Value
+          const entryVal = company.entryValuation || 0;
+          const investAmt = company.investmentAmount || 0;
+          if (fdv > 0 && entryVal > 0) {
+            updateData.moic = fdv / entryVal;
+            if (investAmt > 0) {
+              updateData.netValue = Math.round(investAmt * updateData.moic);
+            }
+          }
+
+          await Database.updateCompany(company.id, updateData);
+          updatedCount++;
+        }
+
+        // Reload data and re-render
+        companiesData = await Database.getCompanies();
+        renderSummary();
+        renderTable();
+
+        showToast(`Updated ${updatedCount} token price${updatedCount !== 1 ? 's' : ''} from CoinGecko`);
+
+      } catch (error) {
+        console.error('Crypto price refresh error:', error);
+        showToast('Error fetching crypto prices: ' + error.message, true);
+      } finally {
+        btn.disabled = false;
+        btnText.textContent = 'Refresh Crypto Prices';
       }
     }
 

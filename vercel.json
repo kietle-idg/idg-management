@@ -4,7 +4,8 @@
     { "source": "/api/sync-sheets", "destination": "/api/sync-sheets.js" },
     { "source": "/api/calendar-events", "destination": "/api/calendar-events.js" },
     { "source": "/api/ai-sync", "destination": "/api/ai-sync.js" },
-    { "source": "/api/chat", "destination": "/api/chat.js" }
+    { "source": "/api/chat", "destination": "/api/chat.js" },
+    { "source": "/api/crypto-prices", "destination": "/api/crypto-prices.js" }
   ],
   "headers": [
     {
