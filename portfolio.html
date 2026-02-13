@@ -633,11 +633,11 @@
             <div class="company-cell">
               <div class="company-icon">${c.logo || c.name?.charAt(0)}</div>
               <div>
-                <div class="company-name" style="cursor:pointer;" onclick="toggleDetail('${c.id}')">
-                  ${c.name}
-                  ${c.coingeckoId ? '<span style="display:inline-block;background:var(--accent-light);color:var(--accent);font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;">LISTED</span>' : ''}
-                  ${c.driveFolderId ? `<a href="https://drive.google.com/drive/folders/${c.driveFolderId}" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="Open dataroom folder" style="margin-left:6px;color:var(--text-muted);vertical-align:middle;text-decoration:none;font-size:14px;">📁</a>` : ''}
-                  ${hasDetails ? '<span style="font-size:11px;color:var(--text-muted);margin-left:4px;">▸</span>' : ''}
+                <div class="company-name" style="display:flex;align-items:center;gap:4px;cursor:pointer;" onclick="toggleDetail('${c.id}')">
+                  <span>${c.name}</span>
+                  ${c.coingeckoId ? '<span style="background:var(--accent-light);color:var(--accent);font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;">LISTED</span>' : ''}
+                  ${hasDetails ? '<span style="font-size:11px;color:var(--text-muted);">▸</span>' : ''}
+                  ${c.driveFolderId ? `<a href="https://drive.google.com/drive/folders/${c.driveFolderId}" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="Open dataroom" style="color:var(--accent);text-decoration:none;font-size:13px;flex-shrink:0;">📁</a>` : '<span style="width:17px;flex-shrink:0;"></span>'}
                 </div>
                 <div class="company-sector">${c.sector}${c.coingeckoId && c.tokenPrice ? ` · $${c.tokenPrice < 0.01 ? c.tokenPrice.toFixed(6) : c.tokenPrice < 1 ? c.tokenPrice.toFixed(4) : c.tokenPrice.toFixed(2)}` : ''}${c.coingeckoId && c.priceChange24h != null ? ` <span style="color:${c.priceChange24h >= 0 ? 'var(--success)' : 'var(--danger)'};font-size:11px;">${c.priceChange24h >= 0 ? '+' : ''}${c.priceChange24h.toFixed(1)}%</span>` : ''}</div>
               </div>
