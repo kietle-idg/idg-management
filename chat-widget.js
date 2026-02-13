@@ -63,16 +63,20 @@
       }
 
       if (c.description) ctx += `Description: ${c.description}\n`;
-      if (c.latestUpdates && c.latestUpdates.length) {
+      // AI-extracted data (stored with "ai" prefix)
+      const updates = c.aiUpdates || c.latestUpdates || [];
+      if (updates.length) {
         ctx += `Latest Updates:\n`;
-        c.latestUpdates.forEach(u => { ctx += `  - ${u}\n`; });
+        updates.forEach(u => { ctx += `  - ${u}\n`; });
       }
-      if (c.highlights && c.highlights.length) {
+      const highlights = c.aiHighlights || c.highlights || [];
+      if (highlights.length) {
         ctx += `Highlights:\n`;
-        c.highlights.forEach(h => { ctx += `  - ${h}\n`; });
+        highlights.forEach(h => { ctx += `  - ${h}\n`; });
       }
-      if (c.keyMetrics && Object.keys(c.keyMetrics).length) {
-        ctx += `Key Metrics: ${JSON.stringify(c.keyMetrics)}\n`;
+      const metrics = c.aiKeyMetrics || c.keyMetrics;
+      if (metrics && Object.keys(metrics).length) {
+        ctx += `Key Metrics: ${JSON.stringify(metrics)}\n`;
       }
       if (c.createdAt) {
         const d = c.createdAt.toDate ? c.createdAt.toDate() : new Date(c.createdAt);
