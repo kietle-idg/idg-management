@@ -66,12 +66,6 @@
               <span style="margin-right: 4px;">📈</span>
               <span id="crypto-prices-text">Refresh Crypto Prices</span>
             </button>
-            <button class="btn btn-secondary" onclick="syncFromSheets()" id="sync-sheets-btn" style="display: none;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 12a9 9 0 11-9-9c2.52 0 4.93 1 6.74 2.74L21 8V3"></path>
-              </svg>
-              <span id="sync-sheets-text">Sync from Sheets</span>
-            </button>
             <button class="btn btn-primary" onclick="showAddCompanyModal()" id="add-company-btn">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -476,7 +470,6 @@
         document.getElementById('add-company-btn').style.display = 'none';
       }
       if (role === 'Admin') {
-        document.getElementById('sync-sheets-btn').style.display = 'inline-flex';
         document.getElementById('ai-sync-btn').style.display = 'inline-flex';
       }
       if (role === 'Admin' || role === 'Team') {
@@ -1216,80 +1209,6 @@
       } finally {
         btn.disabled = false;
         btnText.textContent = 'AI Sync';
-      }
-    }
-
-    // ========================
-    // SYNC FROM GOOGLE SHEETS
-    // ========================
-    async function syncFromSheets() {
-      const btn = document.getElementById('sync-sheets-btn');
-      const btnText = document.getElementById('sync-sheets-text');
-      btn.disabled = true;
-      btnText.textContent = 'Syncing...';
-
-      try {
-        const response = await fetch('/api/sync-sheets');
-        const data = await response.json();
-
-        if (!data.success) {
-          throw new Error(data.error || 'Sync failed');
-        }
-
-        if (!data.companies || data.companies.length === 0) {
-          showToast('No companies found in the sheet', true);
-          return;
-        }
-
-        // Match sheet data to existing Firebase companies & update/create
-        let updated = 0;
-        let created = 0;
-
-        for (const sheetCompany of data.companies) {
-          // Smart matching (same logic as AI sync)
-          const existing = findMatchingCompany(sheetCompany.name, companiesData);
-
-          // Build update data from the sheet (only update financial fields)
-          const updateData = {};
-          if (sheetCompany.investmentAmount > 0) updateData.investmentAmount = sheetCompany.investmentAmount;
-          if (sheetCompany.entryValuation > 0) updateData.entryValuation = sheetCompany.entryValuation;
-          if (sheetCompany.currentValuation > 0) updateData.currentValuation = sheetCompany.currentValuation;
-          if (sheetCompany.ownership > 0) updateData.ownership = sheetCompany.ownership;
-          if (sheetCompany.moic > 0) updateData.moic = sheetCompany.moic;
-          if (sheetCompany.netValue > 0) updateData.netValue = sheetCompany.netValue;
-          if (sheetCompany.investmentDate) updateData.investmentDate = sheetCompany.investmentDate;
-          if (sheetCompany.investors) updateData.investors = sheetCompany.investors;
-
-          if (existing) {
-            // Update existing company
-            await Database.updateCompany(existing.id, updateData);
-            updated++;
-          } else {
-            // Create new company
-            await Database.createCompany({
-              name: sheetCompany.name,
-              sector: '-',
-              stage: 'Seed',
-              status: 'Active',
-              ...updateData
-            });
-            created++;
-          }
-        }
-
-        // Reload data
-        companiesData = await Database.getCompanies();
-        renderSummary();
-        renderTable();
-
-        showToast(`Sync complete! ${updated} updated, ${created} created from ${data.companiesFound} sheet rows.`);
-
-      } catch (error) {
-        console.error('Sheets sync error:', error);
-        showToast('Sync error: ' + error.message, true);
-      } finally {
-        btn.disabled = false;
-        btnText.textContent = 'Sync from Sheets';
       }
     }
 
