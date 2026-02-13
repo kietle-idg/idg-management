@@ -1072,30 +1072,57 @@
     // SMART COMPANY NAME MATCHING
     // ========================
     function findMatchingCompany(folderName, companies) {
-      const strip = (n) => (n || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
-      const folderStrip = strip(folderName);
-      const folderWords = folderStrip.split(/\s+/).filter(w => w.length >= 3);
-      const folderFirstWord = folderStrip.split(/\s+/)[0] || '';
+      // Extract base name and aliases from a name like "Collar (renamed as Votre)" or "OpenLayer (Sixpence)"
+      function parseNames(raw) {
+        const s = (raw || '').trim();
+        const base = s.replace(/\s*\(.*\)\s*/g, '').trim();
+        const aliases = [];
+        const parenMatches = s.match(/\(([^)]+)\)/g) || [];
+        for (const m of parenMatches) {
+          let inner = m.replace(/[()]/g, '').trim();
+          // Strip "renamed as", "now", "formerly", "prev.", "aka", "fka"
+          inner = inner.replace(/^(renamed\s+as|now|formerly|prev\.?|aka|fka)\s+/i, '').trim();
+          if (inner.length >= 2) aliases.push(inner);
+        }
+        return { base, aliases, all: [base, ...aliases] };
+      }
+
+      const strip = (n) => (n || '').toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+      const folder = parseNames(folderName);
+      const folderStrips = folder.all.map(strip).filter(Boolean);
 
       let bestMatch = null;
       let bestScore = 0;
 
       for (const c of companies) {
-        const nameStrip = strip(c.name);
-        const nameWords = nameStrip.split(/\s+/).filter(w => w.length >= 3);
-        const nameFirstWord = nameStrip.split(/\s+/)[0] || '';
+        const comp = parseNames(c.name);
+        const compStrips = comp.all.map(strip).filter(Boolean);
         let score = 0;
 
-        // Exact match after stripping
-        if (nameStrip === folderStrip) { score = 100; }
-        // One contains the other fully
-        else if (nameStrip.includes(folderStrip) || folderStrip.includes(nameStrip)) { score = 80; }
-        // First word matches (e.g. "Aggregata" in both)
-        else if (folderFirstWord.length >= 3 && folderFirstWord === nameFirstWord) { score = 70; }
-        // Any significant word from folder appears in company name
-        else if (folderWords.some(w => nameStrip.includes(w))) { score = 50; }
-        // Any significant word from company name appears in folder
-        else if (nameWords.some(w => folderStrip.includes(w))) { score = 50; }
+        // Check all combinations of folder names vs company names
+        for (const fs of folderStrips) {
+          for (const cs of compStrips) {
+            if (!fs || !cs) continue;
+            // Exact match
+            if (fs === cs) { score = Math.max(score, 100); }
+            // One contains the other
+            else if (fs.length >= 3 && cs.length >= 3 && (fs.includes(cs) || cs.includes(fs))) { score = Math.max(score, 80); }
+          }
+        }
+
+        // Base name first-word match (e.g. "collar" == "collar")
+        if (score < 70) {
+          const folderBase = strip(folder.base);
+          const compBase = strip(comp.base);
+          if (folderBase.length >= 3 && compBase.length >= 3) {
+            if (folderBase === compBase) { score = Math.max(score, 90); }
+            else if (folderBase.includes(compBase) || compBase.includes(folderBase)) { score = Math.max(score, 75); }
+            // First word of base name matches
+            const fw1 = folderBase.substring(0, Math.min(folderBase.length, 6));
+            const fw2 = compBase.substring(0, Math.min(compBase.length, 6));
+            if (fw1.length >= 4 && fw1 === fw2) { score = Math.max(score, 70); }
+          }
+        }
 
         if (score > bestScore) {
           bestScore = score;
@@ -1103,7 +1130,6 @@
         }
       }
 
-      // Only return if we have a reasonable match (score >= 50)
       return bestScore >= 50 ? bestMatch : null;
     }
 

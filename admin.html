@@ -595,19 +595,77 @@
     }
 
     // Save a company to Firebase
+    // Smart name matching (handles "renamed as", aliases in parens, spacing)
+    function smartMatchCompany(folderName, allCompanies) {
+      function parseNames(raw) {
+        const s = (raw || '').trim();
+        const base = s.replace(/\s*\(.*\)\s*/g, '').trim();
+        const aliases = [];
+        const parenMatches = s.match(/\(([^)]+)\)/g) || [];
+        for (const m of parenMatches) {
+          let inner = m.replace(/[()]/g, '').trim();
+          inner = inner.replace(/^(renamed\s+as|now|formerly|prev\.?|aka|fka)\s+/i, '').trim();
+          if (inner.length >= 2) aliases.push(inner);
+        }
+        return { base, aliases, all: [base, ...aliases] };
+      }
+      const strip = (n) => (n || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const folder = parseNames(folderName);
+      const folderStrips = folder.all.map(strip).filter(Boolean);
+
+      let bestMatch = null;
+      let bestScore = 0;
+
+      for (const doc of allCompanies) {
+        const comp = parseNames(doc.name);
+        const compStrips = comp.all.map(strip).filter(Boolean);
+        let score = 0;
+
+        for (const fs of folderStrips) {
+          for (const cs of compStrips) {
+            if (!fs || !cs) continue;
+            if (fs === cs) score = Math.max(score, 100);
+            else if (fs.length >= 3 && cs.length >= 3 && (fs.includes(cs) || cs.includes(fs))) score = Math.max(score, 80);
+          }
+        }
+        if (score < 70) {
+          const fb = strip(folder.base);
+          const cb = strip(comp.base);
+          if (fb.length >= 3 && cb.length >= 3) {
+            if (fb === cb) score = Math.max(score, 90);
+            else if (fb.includes(cb) || cb.includes(fb)) score = Math.max(score, 75);
+          }
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = doc;
+        }
+      }
+      return bestScore >= 50 ? bestMatch : null;
+    }
+
+    // Cache of all companies (loaded once per sync)
+    let allCompaniesCache = null;
+
+    async function loadAllCompanies() {
+      const snapshot = await firebaseDb.collection('companies').get();
+      return snapshot.docs.map(doc => ({ id: doc.id, ref: doc.ref, ...doc.data() }));
+    }
+
     async function saveCompanyToFirebase(company) {
       try {
         console.log('Saving company:', company.name);
-        
+
+        // Load all companies once for smart matching
+        if (!allCompaniesCache) {
+          allCompaniesCache = await loadAllCompanies();
+        }
+
         // Check if company already exists by driveFolderId
-        const existing = await firebaseDb.collection('companies')
-          .where('driveFolderId', '==', company.driveFolderId)
-          .limit(1)
-          .get();
-        
-        if (!existing.empty) {
-          // Update only sync-related fields, preserve user-edited data
-          await existing.docs[0].ref.update({
+        const byFolder = allCompaniesCache.find(c => c.driveFolderId === company.driveFolderId);
+        if (byFolder) {
+          await firebaseDb.collection('companies').doc(byFolder.id).update({
             driveFileCount: company.driveFileCount || 0,
             syncedAt: firebase.firestore.FieldValue.serverTimestamp()
           });
@@ -615,19 +673,18 @@
           return true;
         }
         
-        // Check by name
-        const byName = await firebaseDb.collection('companies')
-          .where('name', '==', company.name)
-          .limit(1)
-          .get();
-        
-        if (!byName.empty) {
-          await byName.docs[0].ref.update({
+        // Smart name matching
+        const byName = smartMatchCompany(company.name, allCompaniesCache);
+        if (byName) {
+          await firebaseDb.collection('companies').doc(byName.id).update({
             driveFolderId: company.driveFolderId,
+            dataroomUrl: `https://drive.google.com/drive/folders/${company.driveFolderId}`,
             driveFileCount: company.driveFileCount || 0,
             syncedAt: firebase.firestore.FieldValue.serverTimestamp()
           });
-          console.log('Updated existing company by name:', company.name);
+          // Update cache
+          byName.driveFolderId = company.driveFolderId;
+          console.log('Updated existing company by smart match:', company.name, '->', byName.name);
           return true;
         }
         
@@ -636,6 +693,7 @@
           name: company.name,
           displayName: company.displayName || company.name,
           driveFolderId: company.driveFolderId,
+          dataroomUrl: `https://drive.google.com/drive/folders/${company.driveFolderId}`,
           driveFileCount: company.driveFileCount || 0,
           status: 'Active',
           sector: 'Other',
@@ -649,6 +707,8 @@
           createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           syncedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
+        // Add to cache
+        allCompaniesCache.push({ id: docRef.id, name: company.name, driveFolderId: company.driveFolderId });
         console.log('Created new company:', company.name, docRef.id);
         return true;
       } catch (error) {
@@ -751,6 +811,7 @@
       let offset = 0;
       let totalFolders = 0;
       let hasMore = true;
+      allCompaniesCache = null; // Reset cache for fresh sync
 
       try {
         // Sync in batches of 10 folders
