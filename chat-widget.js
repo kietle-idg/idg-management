@@ -43,6 +43,8 @@
       if (c.stage) ctx += `Stage: ${c.stage}\n`;
       if (c.location) ctx += `Location: ${c.location}\n`;
       if (c.founder) ctx += `Founders: ${c.founder}\n`;
+      const droomUrl = c.dataroomUrl || (c.driveFolderId ? `https://drive.google.com/drive/folders/${c.driveFolderId}` : null);
+      if (droomUrl) ctx += `Dataroom Link: ${droomUrl}\n`;
       if (c.investmentAmount) ctx += `Investment Amount: $${fmt(c.investmentAmount)}\n`;
       if (c.entryValuation) ctx += `Entry Valuation: $${fmt(c.entryValuation)}\n`;
       if (c.currentValuation) ctx += `Current Valuation: $${fmt(c.currentValuation)}\n`;
