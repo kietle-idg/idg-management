@@ -409,6 +409,10 @@
               <label class="form-label">Description</label>
               <input type="text" class="form-input" id="edit-company-description">
             </div>
+            <div class="form-group" style="grid-column: span 2;">
+              <label class="form-label">Dataroom URL</label>
+              <input type="url" class="form-input" id="edit-company-dataroom-url" placeholder="https://drive.google.com/drive/folders/...">
+            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -630,7 +634,7 @@
                   <span>${c.name}</span>
                   ${c.coingeckoId ? '<span style="background:var(--accent-light);color:var(--accent);font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;">LISTED</span>' : ''}
                   ${hasDetails ? '<span style="font-size:11px;color:var(--text-muted);">▸</span>' : ''}
-                  ${c.driveFolderId ? `<a href="https://drive.google.com/drive/folders/${c.driveFolderId}" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="Open dataroom" style="color:var(--accent);text-decoration:none;font-size:13px;flex-shrink:0;">📁</a>` : '<span style="width:17px;flex-shrink:0;"></span>'}
+                  ${(c.dataroomUrl || c.driveFolderId) ? `<a href="${c.dataroomUrl || 'https://drive.google.com/drive/folders/' + c.driveFolderId}" target="_blank" rel="noopener" onclick="event.stopPropagation();" title="Open dataroom" style="color:var(--accent);text-decoration:none;font-size:13px;flex-shrink:0;">📁</a>` : '<span style="width:17px;flex-shrink:0;"></span>'}
                 </div>
                 <div class="company-sector">${c.sector}${c.coingeckoId && c.tokenPrice ? ` · $${c.tokenPrice < 0.01 ? c.tokenPrice.toFixed(6) : c.tokenPrice < 1 ? c.tokenPrice.toFixed(4) : c.tokenPrice.toFixed(2)}` : ''}${c.coingeckoId && c.priceChange24h != null ? ` <span style="color:${c.priceChange24h >= 0 ? 'var(--success)' : 'var(--danger)'};font-size:11px;">${c.priceChange24h >= 0 ? '+' : ''}${c.priceChange24h.toFixed(1)}%</span>` : ''}</div>
               </div>
@@ -681,7 +685,7 @@
                     ${c.founder ? `<p style="font-size:13px;margin:0 0 4px;"><strong>Founder:</strong> <span style="color:var(--text-secondary);">${c.founder}</span></p>` : ''}
                     ${c.location ? `<p style="font-size:13px;margin:0 0 4px;"><strong>Location:</strong> <span style="color:var(--text-secondary);">${c.location}</span></p>` : ''}
                     ${c.investors ? `<p style="font-size:13px;margin:0 0 4px;"><strong>Investors:</strong> <span style="color:var(--text-secondary);">${c.investors}</span></p>` : ''}
-                    ${c.driveFolderId ? `<p style="font-size:13px;margin:0 0 4px;"><strong>Dataroom:</strong> <a href="https://drive.google.com/drive/folders/${c.driveFolderId}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;">Open in Google Drive →</a></p>` : ''}
+                    ${(c.dataroomUrl || c.driveFolderId) ? `<p style="font-size:13px;margin:0 0 4px;"><strong>Dataroom:</strong> <a href="${c.dataroomUrl || 'https://drive.google.com/drive/folders/' + c.driveFolderId}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;">Open in Google Drive →</a></p>` : ''}
                   </div>
                   ${c.lastAiSync ? `
                     <p style="margin-top:16px;font-size:11px;color:var(--text-muted);">🤖 Last AI sync: ${new Date(c.lastAiSync).toLocaleString()}</p>
@@ -906,6 +910,7 @@
       document.getElementById('edit-company-location').value = company.location || '';
       document.getElementById('edit-company-description').value = company.description || '';
       document.getElementById('edit-company-coingecko-id').value = company.coingeckoId || '';
+      document.getElementById('edit-company-dataroom-url').value = company.dataroomUrl || (company.driveFolderId ? `https://drive.google.com/drive/folders/${company.driveFolderId}` : '');
 
       // Populate exit fields
       document.getElementById('edit-company-exit-date').value = company.exitDate || '';
@@ -992,6 +997,7 @@
         location,
         description,
         coingeckoId: document.getElementById('edit-company-coingecko-id').value.trim().toLowerCase() || null,
+        dataroomUrl: document.getElementById('edit-company-dataroom-url').value.trim() || null,
         manualFields: [...manualFields]
       };
 
