@@ -21,6 +21,14 @@ const Auth = {
               firebaseDb.collection('users').doc(user.uid).update({
                 lastLogin: firebase.firestore.FieldValue.serverTimestamp()
               });
+            } else {
+              // User auth exists but profile doc was deleted from Firestore.
+              // Treat this as access revoked and force sign out.
+              this.currentUser = null;
+              this.currentUserData = null;
+              await firebaseAuth.signOut();
+              resolve(null);
+              return;
             }
           } catch (error) {
             console.error('Error fetching user data:', error);
