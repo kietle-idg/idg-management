@@ -423,19 +423,16 @@
     let calendarAccessToken = null;
 
     function initGoogleCalendar() {
-      // Show connect button
       const btn = document.getElementById('connect-calendar-btn');
-      btn.style.display = 'inline-flex';
       btn.onclick = connectCalendar;
 
-      // Wait for GIS library to load, then init token client
       const waitForGis = setInterval(() => {
         if (typeof google !== 'undefined' && google.accounts) {
           clearInterval(waitForGis);
           tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CALENDAR_CLIENT_ID,
             scope: CALENDAR_SCOPES,
-            hint: DEAL_CALENDAR_ID,  // Pre-select deal@ account in the popup
+            hint: Auth.currentUser?.email || DEAL_CALENDAR_ID,
             callback: (tokenResponse) => {
               if (tokenResponse && tokenResponse.access_token) {
                 calendarAccessToken = tokenResponse.access_token;
@@ -445,18 +442,33 @@
             },
             error_callback: (error) => {
               console.error('Calendar auth error:', error);
+              btn.style.display = 'inline-flex';
             }
           });
+
+          // Auto-connect: try silent token request (no popup if previously consented)
+          try {
+            tokenClient.requestAccessToken({ prompt: '' });
+          } catch (e) {
+            // Silent request not supported or failed — show button
+            btn.style.display = 'inline-flex';
+          }
         }
       }, 200);
 
-      // Show placeholder while waiting
+      // Auto-show button after 3s if silent auth hasn't completed
+      setTimeout(() => {
+        if (!calendarAccessToken) {
+          btn.style.display = 'inline-flex';
+        }
+      }, 3000);
+
       renderEvents();
     }
 
     function connectCalendar() {
       if (tokenClient) {
-        tokenClient.requestAccessToken();
+        tokenClient.requestAccessToken({ prompt: 'consent' });
       }
     }
 

@@ -198,9 +198,24 @@
         calendarTokenClient = google.accounts.oauth2.initTokenClient({
           client_id: '728812948064-2kdc14o4emgtn9ak4tioqme5d62ev6sa.apps.googleusercontent.com',
           scope: 'https://www.googleapis.com/auth/calendar.readonly',
-          callback: handleCalendarCallback
+          hint: Auth.currentUser?.email || '',
+          callback: handleCalendarCallback,
+          error_callback: (error) => {
+            console.error('Calendar silent auth failed:', error);
+            document.getElementById('calendar-connect').style.display = 'block';
+          }
         });
         console.log('Calendar token client initialized');
+
+        // Auto-connect: try silent token request (no popup if previously consented)
+        try {
+          document.getElementById('calendar-loading').style.display = 'block';
+          document.getElementById('calendar-connect').style.display = 'none';
+          calendarTokenClient.requestAccessToken({ prompt: '' });
+        } catch (e) {
+          document.getElementById('calendar-loading').style.display = 'none';
+          document.getElementById('calendar-connect').style.display = 'block';
+        }
       } else {
         console.log('Google Identity Services not ready, retrying...');
         setTimeout(initCalendarClient, 500);
@@ -250,6 +265,14 @@
     
     // Initialize on page load
     setTimeout(initCalendarClient, 1000);
+
+    // Show connect button if silent auth hasn't completed after 3s
+    setTimeout(() => {
+      if (!document.getElementById('events-list').innerHTML.trim()) {
+        document.getElementById('calendar-loading').style.display = 'none';
+        document.getElementById('calendar-connect').style.display = 'block';
+      }
+    }, 4000);
 
     // Fetch events from Google Calendar
     async function fetchCalendarEvents(token) {
