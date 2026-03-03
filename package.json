@@ -6,6 +6,7 @@
     "dev": "python3 -m http.server 8080"
   },
   "dependencies": {
-    "googleapis": "^137.0.0"
+    "googleapis": "^137.0.0",
+    "pdf-parse": "^1.1.1"
   }
 }

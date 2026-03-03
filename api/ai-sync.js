@@ -1,4 +1,5 @@
 const { google } = require('googleapis');
+const pdfParse = require('pdf-parse');
 
 const FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
 
@@ -112,9 +113,25 @@ async function getFileContent(drive, file) {
       return { name: file.name, type: 'Text', content: text.substring(0, 4000) };
     }
     
-    // Binary files (PDF, Word, Excel, etc.) — return filename only
+    // PDF — extract text via pdf-parse
+    if (mimeType === 'application/pdf') {
+      try {
+        const res = await drive.files.get({ fileId: file.id, alt: 'media' }, { responseType: 'arraybuffer' });
+        const buffer = Buffer.from(res.data);
+        const pdf = await pdfParse(buffer);
+        const text = (pdf.text || '').substring(0, 5000);
+        if (text.trim().length > 50) {
+          return { name: file.name, type: 'PDF', content: text };
+        }
+        return { name: file.name, type: 'PDF', content: null };
+      } catch (e) {
+        console.error(`PDF parse error for ${file.name}:`, e.message);
+        return { name: file.name, type: 'PDF', content: null };
+      }
+    }
+
+    // Other binary files — return filename only
     const typeNames = {
-      'application/pdf': 'PDF',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'Excel',
       'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PowerPoint',
