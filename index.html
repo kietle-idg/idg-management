@@ -453,9 +453,16 @@
       return d;
     }
 
+    function toLocalDateStr(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
     async function loadICMeetings() {
       const fri = getNextFriday();
-      icMeetingDate = fri.toISOString().split('T')[0];
+      icMeetingDate = toLocalDateStr(fri);
       icMeetingData = (await Database.getICMeeting(icMeetingDate)) || {};
       renderICMeetings();
     }
