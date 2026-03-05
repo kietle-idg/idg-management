@@ -365,6 +365,59 @@ const Database = {
   },
 
   // ==================
+  // IC MEETING OPERATIONS
+  // ==================
+
+  async getICMeeting(dateStr) {
+    try {
+      const doc = await firebaseDb.collection('icMeetings').doc(dateStr).get();
+      return doc.exists ? { id: doc.id, ...doc.data() } : null;
+    } catch (error) {
+      console.error('Error getting IC meeting:', error);
+      return null;
+    }
+  },
+
+  async getUpcomingICMeetings(limit = 4) {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const snapshot = await firebaseDb.collection('icMeetings')
+        .where('date', '>=', today)
+        .orderBy('date')
+        .limit(limit)
+        .get();
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      console.error('Error getting upcoming IC meetings:', error);
+      return [];
+    }
+  },
+
+  async saveICMeeting(dateStr, data) {
+    try {
+      await firebaseDb.collection('icMeetings').doc(dateStr).set({
+        ...data,
+        date: dateStr,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      return { success: true };
+    } catch (error) {
+      console.error('Error saving IC meeting:', error);
+      return { success: false, error };
+    }
+  },
+
+  async deleteICMeeting(dateStr) {
+    try {
+      await firebaseDb.collection('icMeetings').doc(dateStr).delete();
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting IC meeting:', error);
+      return { success: false, error };
+    }
+  },
+
+  // ==================
   // ACTIVITY LOG
   // ==================
 

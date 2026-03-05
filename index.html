@@ -145,29 +145,48 @@
               </div>
             </div>
 
-            <!-- Upcoming Events -->
+            <!-- Weekly IC Meetings -->
             <div class="card">
               <div class="card-header">
-                <h3 class="card-title">Upcoming Events</h3>
-                <div style="display: flex; gap: 8px; align-items: center;">
-                  <button class="btn btn-primary btn-sm" id="connect-calendar-btn" style="display: none;">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                      <line x1="16" y1="2" x2="16" y2="6"></line>
-                      <line x1="8" y1="2" x2="8" y2="6"></line>
-                      <line x1="3" y1="10" x2="21" y2="10"></line>
-                    </svg>
-                    Connect Calendar
-                  </button>
-                  <a href="personal.html" class="btn btn-ghost btn-sm">View all</a>
-                </div>
+                <h3 class="card-title">Weekly IC Meeting</h3>
+                <span style="font-size:11px;color:var(--text-muted);">Every Friday</span>
               </div>
-              <div class="card-body">
-                <div id="calendar-loading" style="display: none; text-align: center; padding: 16px; color: var(--text-muted);">
-                  <div class="spinner" style="width: 20px; height: 20px; border-width: 2px; margin: 0 auto 8px;"></div>
-                  Loading calendar...
+              <div class="card-body" style="padding:0;">
+                <div id="ic-meetings-list"></div>
+              </div>
+            </div>
+
+            <!-- IC Meeting Edit Modal -->
+            <div id="ic-edit-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.4);align-items:center;justify-content:center;">
+              <div style="background:var(--bg-primary);border-radius:12px;width:520px;max-width:90vw;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+                <div style="padding:20px 24px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;">
+                  <h3 style="margin:0;font-size:16px;" id="ic-modal-title">Edit IC Meeting</h3>
+                  <button onclick="closeICModal()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted);">&times;</button>
                 </div>
-                <ul class="list" id="upcoming-events"></ul>
+                <div style="padding:24px;">
+                  <input type="hidden" id="ic-edit-date">
+                  <div style="margin-bottom:16px;">
+                    <label class="form-label">Time</label>
+                    <input type="text" class="form-input" id="ic-edit-time" placeholder="e.g. 2:00 PM">
+                  </div>
+                  <div style="margin-bottom:16px;">
+                    <label class="form-label">Location / Link</label>
+                    <input type="text" class="form-input" id="ic-edit-location" placeholder="e.g. Conference Room A or Zoom link">
+                  </div>
+                  <div style="margin-bottom:16px;">
+                    <label class="form-label">Agenda Items</label>
+                    <div id="ic-agenda-items"></div>
+                    <button type="button" onclick="addAgendaItem()" class="btn btn-ghost btn-sm" style="margin-top:8px;">+ Add item</button>
+                  </div>
+                  <div style="margin-bottom:16px;">
+                    <label class="form-label">Notes</label>
+                    <textarea class="form-input" id="ic-edit-notes" rows="3" placeholder="Meeting notes or follow-ups..."></textarea>
+                  </div>
+                  <div style="display:flex;gap:8px;justify-content:flex-end;">
+                    <button onclick="closeICModal()" class="btn btn-ghost">Cancel</button>
+                    <button onclick="saveICMeeting()" class="btn btn-primary">Save</button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -184,14 +203,11 @@
   <script src="auth.js"></script>
   <script src="database.js"></script>
   <script src="chat-widget.js"></script>
-  <!-- Google API for Calendar -->
-  <script src="https://apis.google.com/js/api.js"></script>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
   
   <script>
     let fundData = null;
     let companiesData = [];
-    let eventsData = [];
+    let icMeetingsData = [];
 
     async function init() {
       // Check authentication with timeout
@@ -241,8 +257,8 @@
         companiesData = [];
       }
 
-      // Initialize Google Calendar (client-side OAuth)
-      initGoogleCalendar();
+      // Load IC meetings
+      loadICMeetings();
 
       // Role-based view
       if (role === 'LP') {
@@ -268,7 +284,7 @@
         renderTopCompanies();
       }
 
-      renderEvents();
+      renderICMeetings();
       
       document.getElementById('loading-state').classList.add('hidden');
       document.getElementById('dashboard-content').classList.remove('hidden');
@@ -415,157 +431,144 @@
       document.getElementById('top-companies').innerHTML = html || '<tr><td colspan="3" class="text-center text-muted">No companies</td></tr>';
     }
 
-    // ── Google Calendar (client-side OAuth) ──
-    const CALENDAR_CLIENT_ID = '728812948064-2kdc14o4emgtn9ak4tioqme5d62ev6sa.apps.googleusercontent.com';
-    const CALENDAR_SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
-    const DEAL_CALENDAR_ID = 'deal@idgcapitalvietnam.com';
-    let tokenClient = null;
-    let calendarAccessToken = null;
-
-    function initGoogleCalendar() {
-      const btn = document.getElementById('connect-calendar-btn');
-      btn.onclick = connectCalendar;
-
-      const waitForGis = setInterval(() => {
-        if (typeof google !== 'undefined' && google.accounts) {
-          clearInterval(waitForGis);
-          tokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: CALENDAR_CLIENT_ID,
-            scope: CALENDAR_SCOPES,
-            hint: Auth.currentUser?.email || DEAL_CALENDAR_ID,
-            callback: (tokenResponse) => {
-              if (tokenResponse && tokenResponse.access_token) {
-                calendarAccessToken = tokenResponse.access_token;
-                btn.style.display = 'none';
-                fetchCalendarEvents();
-              }
-            },
-            error_callback: (error) => {
-              console.error('Calendar auth error:', error);
-              btn.style.display = 'inline-flex';
-            }
-          });
-
-          // Auto-connect: try silent token request (no popup if previously consented)
-          try {
-            tokenClient.requestAccessToken({ prompt: '' });
-          } catch (e) {
-            // Silent request not supported or failed — show button
-            btn.style.display = 'inline-flex';
-          }
-        }
-      }, 200);
-
-      // Auto-show button after 3s if silent auth hasn't completed
-      setTimeout(() => {
-        if (!calendarAccessToken) {
-          btn.style.display = 'inline-flex';
-        }
-      }, 3000);
-
-      renderEvents();
+    function showToast(msg, isError) {
+      const t = document.createElement('div');
+      t.textContent = msg;
+      t.style.cssText = `position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;color:#fff;font-size:13px;z-index:9999;background:${isError ? 'var(--danger)' : 'var(--accent)'};box-shadow:0 4px 12px rgba(0,0,0,.15);`;
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 3000);
     }
 
-    function connectCalendar() {
-      if (tokenClient) {
-        tokenClient.requestAccessToken({ prompt: 'consent' });
+    // ── Weekly IC Meetings ──
+
+    function getNextFridays(count = 4) {
+      const fridays = [];
+      const d = new Date();
+      const day = d.getDay();
+      // Days until next Friday (0=Sun). If today is Friday and before EOD, include today
+      let diff = (5 - day + 7) % 7;
+      if (diff === 0) diff = 0; // today is Friday, include it
+      d.setDate(d.getDate() + diff);
+      d.setHours(0, 0, 0, 0);
+      for (let i = 0; i < count; i++) {
+        fridays.push(new Date(d));
+        d.setDate(d.getDate() + 7);
       }
+      return fridays;
     }
 
-    async function fetchCalendarEvents() {
-      const loadingEl = document.getElementById('calendar-loading');
-      loadingEl.style.display = 'block';
+    function fridayKey(date) {
+      return date.toISOString().split('T')[0];
+    }
 
-      try {
-        // Try deal@ calendar first, fall back to primary
-        let calendarId = DEAL_CALENDAR_ID;
-        let response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?` +
-          new URLSearchParams({
-            timeMin: new Date().toISOString(),
-            showDeleted: 'false',
-            singleEvents: 'true',
-            maxResults: '10',
-            orderBy: 'startTime'
-          }), {
-            headers: { 'Authorization': `Bearer ${calendarAccessToken}` }
-          });
+    async function loadICMeetings() {
+      const fridays = getNextFridays(4);
+      const promises = fridays.map(f => Database.getICMeeting(fridayKey(f)));
+      const results = await Promise.all(promises);
+      icMeetingsData = fridays.map((f, i) => ({
+        date: fridayKey(f),
+        dateObj: f,
+        ...(results[i] || {})
+      }));
+      renderICMeetings();
+    }
 
-        // If deal@ calendar not accessible, try primary
-        if (!response.ok) {
-          console.warn('deal@ calendar not accessible, trying primary calendar');
-          calendarId = 'primary';
-          response = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events?` +
-            new URLSearchParams({
-              timeMin: new Date().toISOString(),
-              showDeleted: 'false',
-              singleEvents: 'true',
-              maxResults: '10',
-              orderBy: 'startTime'
-            }), {
-              headers: { 'Authorization': `Bearer ${calendarAccessToken}` }
-            });
-        }
-
-        if (!response.ok) {
-          const err = await response.json();
-          throw new Error(err.error?.message || `API error ${response.status}`);
-        }
-
-        const data = await response.json();
-        eventsData = (data.items || []).map(event => {
-          const start = event.start.dateTime || event.start.date;
-          const isAllDay = !event.start.dateTime;
-          const startDate = new Date(start);
-          return {
-            title: event.summary || '(No title)',
-            date: isAllDay ? event.start.date : startDate.toISOString().split('T')[0],
-            time: isAllDay ? 'All Day' : startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            location: event.location || '',
-            type: 'Calendar'
-          };
-        });
-
-        renderEvents();
-      } catch (error) {
-        console.error('Calendar fetch error:', error);
-        document.getElementById('upcoming-events').innerHTML =
-          '<li class="empty-state" style="padding: 24px;"><p style="color: var(--danger);">Error loading calendar: ' + error.message + '</p></li>';
-      } finally {
-        loadingEl.style.display = 'none';
+    function renderICMeetings() {
+      const role = Auth.currentUserData?.role;
+      const canEdit = role === 'Admin' || role === 'GP';
+      const container = document.getElementById('ic-meetings-list');
+      if (!icMeetingsData.length) {
+        container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);">Loading...</div>';
+        return;
       }
-    }
 
-    function renderEvents() {
-      let events = (eventsData || [])
-        .filter(e => e.date && getDaysUntil(e.date) >= 0)
-        .sort((a, b) => new Date(a.date) - new Date(b.date))
-        .slice(0, 5);
+      container.innerHTML = icMeetingsData.map((m, idx) => {
+        const d = new Date(m.date + 'T12:00:00');
+        const day = d.getDate();
+        const month = d.toLocaleDateString('en-US', { month: 'short' });
+        const isThisWeek = idx === 0;
+        const agenda = m.agenda || [];
+        const agendaPreview = agenda.length
+          ? agenda.slice(0, 3).map(a => `<span style="display:inline-block;background:var(--bg-secondary);border-radius:4px;padding:2px 8px;font-size:11px;color:var(--text-secondary);margin:2px 4px 2px 0;">${a}</span>`).join('') + (agenda.length > 3 ? `<span style="font-size:11px;color:var(--text-muted);">+${agenda.length - 3} more</span>` : '')
+          : '<span style="font-size:12px;color:var(--text-muted);font-style:italic;">No agenda set</span>';
+        const time = m.time || '2:00 PM';
+        const loc = m.location ? ` · ${m.location}` : '';
+        const notes = m.notes ? `<div style="margin-top:6px;font-size:11px;color:var(--text-muted);line-height:1.4;border-left:2px solid var(--border-color);padding-left:8px;">${m.notes}</div>` : '';
 
-      const html = events.map(e => {
-        const d = formatDateShort(e.date);
-        const location = e.location ? ` · ${e.location}` : '';
         return `
-          <li class="list-item">
-            <div class="event-date">
-              <div class="event-day">${d.day}</div>
-              <div class="event-month">${d.month}</div>
+          <div style="padding:14px 20px;border-bottom:1px solid var(--border-color);${isThisWeek ? 'background:var(--accent-light);' : ''}" class="ic-meeting-row">
+            <div style="display:flex;align-items:flex-start;gap:14px;">
+              <div style="text-align:center;min-width:40px;">
+                <div style="font-size:20px;font-weight:700;color:${isThisWeek ? 'var(--accent)' : 'var(--text-primary)'};">${day}</div>
+                <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">${month}</div>
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                  <span style="font-size:13px;font-weight:600;color:var(--text-primary);">IC Meeting</span>
+                  ${isThisWeek ? '<span style="background:var(--accent);color:#fff;font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;">THIS WEEK</span>' : ''}
+                </div>
+                <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">${time}${loc}</div>
+                <div style="line-height:1.8;">${agendaPreview}</div>
+                ${notes}
+              </div>
+              ${canEdit ? `<button onclick="openICModal('${m.date}')" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--text-muted);flex-shrink:0;" title="Edit">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>` : ''}
             </div>
-            <div class="event-content">
-              <div class="event-title">${e.title}</div>
-              <div class="event-meta">${e.time || ''}${location}</div>
-            </div>
-          </li>
+          </div>
         `;
       }).join('');
+    }
 
-      if (html) {
-        document.getElementById('upcoming-events').innerHTML = html;
-      } else if (!calendarAccessToken) {
-        document.getElementById('upcoming-events').innerHTML =
-          '<li class="empty-state" style="padding: 24px;"><p>Click "Connect Calendar" to see upcoming events from deal@idgcapitalvietnam.com</p></li>';
+    // ── IC Meeting Edit Modal ──
+
+    function openICModal(dateStr) {
+      const meeting = icMeetingsData.find(m => m.date === dateStr) || {};
+      document.getElementById('ic-edit-date').value = dateStr;
+      const d = new Date(dateStr + 'T12:00:00');
+      document.getElementById('ic-modal-title').textContent = `IC Meeting — ${d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+      document.getElementById('ic-edit-time').value = meeting.time || '2:00 PM';
+      document.getElementById('ic-edit-location').value = meeting.location || '';
+      document.getElementById('ic-edit-notes').value = meeting.notes || '';
+
+      const agendaContainer = document.getElementById('ic-agenda-items');
+      agendaContainer.innerHTML = '';
+      const items = (meeting.agenda && meeting.agenda.length) ? meeting.agenda : [''];
+      items.forEach(item => addAgendaItem(item));
+
+      document.getElementById('ic-edit-modal').style.display = 'flex';
+    }
+
+    function closeICModal() {
+      document.getElementById('ic-edit-modal').style.display = 'none';
+    }
+
+    function addAgendaItem(value = '') {
+      const container = document.getElementById('ic-agenda-items');
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;';
+      row.innerHTML = `
+        <input type="text" class="form-input ic-agenda-input" value="${value.replace(/"/g, '&quot;')}" placeholder="Agenda item..." style="flex:1;">
+        <button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:18px;padding:0 4px;">&times;</button>
+      `;
+      container.appendChild(row);
+    }
+
+    async function saveICMeeting() {
+      const dateStr = document.getElementById('ic-edit-date').value;
+      const time = document.getElementById('ic-edit-time').value.trim();
+      const location = document.getElementById('ic-edit-location').value.trim();
+      const notes = document.getElementById('ic-edit-notes').value.trim();
+      const agendaInputs = document.querySelectorAll('#ic-agenda-items .ic-agenda-input');
+      const agenda = Array.from(agendaInputs).map(i => i.value.trim()).filter(Boolean);
+
+      const result = await Database.saveICMeeting(dateStr, { time, location, notes, agenda });
+      if (result.success) {
+        closeICModal();
+        await loadICMeetings();
+        showToast('IC Meeting updated');
       } else {
-        document.getElementById('upcoming-events').innerHTML =
-          '<li class="empty-state" style="padding: 24px;"><p>No upcoming events</p></li>';
+        showToast('Error saving meeting', true);
       }
     }
 
