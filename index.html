@@ -145,25 +145,25 @@
               </div>
             </div>
 
-            <!-- Weekly IC Meetings -->
+            <!-- Weekly IC Meeting -->
             <div class="card">
               <div class="card-header">
                 <h3 class="card-title">Weekly IC Meeting</h3>
-                <span style="font-size:11px;color:var(--text-muted);">Every Friday</span>
+                <span id="ic-edit-btn" style="display:none;cursor:pointer;color:var(--text-muted);" title="Edit" onclick="openICModal()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </span>
               </div>
-              <div class="card-body" style="padding:0;">
-                <div id="ic-meetings-list"></div>
-              </div>
+              <div class="card-body" id="ic-meeting-card" style="padding:20px;"></div>
             </div>
 
             <!-- IC Meeting Edit Modal -->
-            <div id="ic-edit-modal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.4);align-items:center;justify-content:center;">
-              <div style="background:var(--bg-primary);border-radius:12px;width:520px;max-width:90vw;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);">
-                <div style="padding:20px 24px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;">
-                  <h3 style="margin:0;font-size:16px;" id="ic-modal-title">Edit IC Meeting</h3>
-                  <button onclick="closeICModal()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted);">&times;</button>
+            <div id="ic-edit-modal" class="modal-overlay">
+              <div class="modal">
+                <div class="modal-header">
+                  <h3 id="ic-modal-title" class="modal-title">Edit IC Meeting</h3>
+                  <button onclick="closeICModal()" class="modal-close">&times;</button>
                 </div>
-                <div style="padding:24px;">
+                <div class="modal-body">
                   <input type="hidden" id="ic-edit-date">
                   <div style="margin-bottom:16px;">
                     <label class="form-label">Time</label>
@@ -174,11 +174,11 @@
                     <input type="text" class="form-input" id="ic-edit-location" placeholder="e.g. Conference Room A or Zoom link">
                   </div>
                   <div style="margin-bottom:16px;">
-                    <label class="form-label">Agenda Items</label>
+                    <label class="form-label">Agenda</label>
                     <div id="ic-agenda-items"></div>
-                    <button type="button" onclick="addAgendaItem()" class="btn btn-ghost btn-sm" style="margin-top:8px;">+ Add item</button>
+                    <button type="button" onclick="addAgendaItem()" class="btn btn-ghost btn-sm" style="margin-top:6px;">+ Add item</button>
                   </div>
-                  <div style="margin-bottom:16px;">
+                  <div style="margin-bottom:20px;">
                     <label class="form-label">Notes</label>
                     <textarea class="form-input" id="ic-edit-notes" rows="3" placeholder="Meeting notes or follow-ups..."></textarea>
                   </div>
@@ -207,7 +207,6 @@
   <script>
     let fundData = null;
     let companiesData = [];
-    let icMeetingsData = [];
 
     async function init() {
       // Check authentication with timeout
@@ -439,108 +438,105 @@
       setTimeout(() => t.remove(), 3000);
     }
 
-    // ── Weekly IC Meetings ──
+    // ── Weekly IC Meeting (next Friday only) ──
 
-    function getNextFridays(count = 4) {
-      const fridays = [];
+    let icMeetingDate = null;
+    let icMeetingData = {};
+
+    function getNextFriday() {
       const d = new Date();
       const day = d.getDay();
-      // Days until next Friday (0=Sun). If today is Friday and before EOD, include today
       let diff = (5 - day + 7) % 7;
-      if (diff === 0) diff = 0; // today is Friday, include it
+      if (diff === 0) diff = 0;
       d.setDate(d.getDate() + diff);
       d.setHours(0, 0, 0, 0);
-      for (let i = 0; i < count; i++) {
-        fridays.push(new Date(d));
-        d.setDate(d.getDate() + 7);
-      }
-      return fridays;
-    }
-
-    function fridayKey(date) {
-      return date.toISOString().split('T')[0];
+      return d;
     }
 
     async function loadICMeetings() {
-      const fridays = getNextFridays(4);
-      const promises = fridays.map(f => Database.getICMeeting(fridayKey(f)));
-      const results = await Promise.all(promises);
-      icMeetingsData = fridays.map((f, i) => ({
-        date: fridayKey(f),
-        dateObj: f,
-        ...(results[i] || {})
-      }));
+      const fri = getNextFriday();
+      icMeetingDate = fri.toISOString().split('T')[0];
+      icMeetingData = (await Database.getICMeeting(icMeetingDate)) || {};
       renderICMeetings();
     }
 
     function renderICMeetings() {
       const role = Auth.currentUserData?.role;
       const canEdit = role === 'Admin' || role === 'GP';
-      const container = document.getElementById('ic-meetings-list');
-      if (!icMeetingsData.length) {
-        container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted);">Loading...</div>';
+      const container = document.getElementById('ic-meeting-card');
+      const editBtn = document.getElementById('ic-edit-btn');
+
+      if (canEdit) editBtn.style.display = '';
+
+      if (!icMeetingDate) {
+        container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:8px;">Loading...</div>';
         return;
       }
 
-      container.innerHTML = icMeetingsData.map((m, idx) => {
-        const d = new Date(m.date + 'T12:00:00');
-        const day = d.getDate();
-        const month = d.toLocaleDateString('en-US', { month: 'short' });
-        const isThisWeek = idx === 0;
-        const agenda = m.agenda || [];
-        const agendaPreview = agenda.length
-          ? agenda.slice(0, 3).map(a => `<span style="display:inline-block;background:var(--bg-secondary);border-radius:4px;padding:2px 8px;font-size:11px;color:var(--text-secondary);margin:2px 4px 2px 0;">${a}</span>`).join('') + (agenda.length > 3 ? `<span style="font-size:11px;color:var(--text-muted);">+${agenda.length - 3} more</span>` : '')
-          : '<span style="font-size:12px;color:var(--text-muted);font-style:italic;">No agenda set</span>';
-        const time = m.time || '2:00 PM';
-        const loc = m.location ? ` · ${m.location}` : '';
-        const notes = m.notes ? `<div style="margin-top:6px;font-size:11px;color:var(--text-muted);line-height:1.4;border-left:2px solid var(--border-color);padding-left:8px;">${m.notes}</div>` : '';
+      const d = new Date(icMeetingDate + 'T12:00:00');
+      const dateLabel = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+      const time = icMeetingData.time || '2:00 PM';
+      const loc = icMeetingData.location || '';
+      const agenda = icMeetingData.agenda || [];
+      const notes = icMeetingData.notes || '';
 
-        return `
-          <div style="padding:14px 20px;border-bottom:1px solid var(--border-color);${isThisWeek ? 'background:var(--accent-light);' : ''}" class="ic-meeting-row">
-            <div style="display:flex;align-items:flex-start;gap:14px;">
-              <div style="text-align:center;min-width:40px;">
-                <div style="font-size:20px;font-weight:700;color:${isThisWeek ? 'var(--accent)' : 'var(--text-primary)'};">${day}</div>
-                <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">${month}</div>
-              </div>
-              <div style="flex:1;min-width:0;">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-                  <span style="font-size:13px;font-weight:600;color:var(--text-primary);">IC Meeting</span>
-                  ${isThisWeek ? '<span style="background:var(--accent);color:#fff;font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;">THIS WEEK</span>' : ''}
-                </div>
-                <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">${time}${loc}</div>
-                <div style="line-height:1.8;">${agendaPreview}</div>
-                ${notes}
-              </div>
-              ${canEdit ? `<button onclick="openICModal('${m.date}')" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--text-muted);flex-shrink:0;" title="Edit">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              </button>` : ''}
-            </div>
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const daysAway = Math.round((d - today) / 86400000);
+      const proximityLabel = daysAway === 0 ? 'Today' : daysAway === 1 ? 'Tomorrow' : `In ${daysAway} days`;
+
+      container.innerHTML = `
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+          <div style="width:48px;height:48px;border-radius:10px;background:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
           </div>
-        `;
-      }).join('');
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:600;color:var(--text-primary);">${dateLabel}</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">${time}${loc ? ' · ' + loc : ''} · <span style="color:var(--accent);font-weight:500;">${proximityLabel}</span></div>
+          </div>
+        </div>
+        ${agenda.length ? `
+          <div style="margin-bottom:${notes ? '12px' : '0'};">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px;">Agenda</div>
+            ${agenda.map((a, i) => `
+              <div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;${i < agenda.length - 1 ? 'border-bottom:1px solid var(--border-color);' : ''}">
+                <span style="color:var(--accent);font-weight:600;font-size:12px;min-width:18px;">${i + 1}.</span>
+                <span style="font-size:13px;color:var(--text-secondary);line-height:1.4;">${a}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : '<div style="color:var(--text-muted);font-size:13px;font-style:italic;margin-bottom:' + (notes ? '12px' : '0') + ';">No agenda set yet</div>'}
+        ${notes ? `
+          <div style="background:var(--bg-secondary);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--text-secondary);line-height:1.5;">
+            <span style="font-weight:600;color:var(--text-primary);">Notes:</span> ${notes}
+          </div>
+        ` : ''}
+      `;
     }
 
     // ── IC Meeting Edit Modal ──
 
-    function openICModal(dateStr) {
-      const meeting = icMeetingsData.find(m => m.date === dateStr) || {};
-      document.getElementById('ic-edit-date').value = dateStr;
-      const d = new Date(dateStr + 'T12:00:00');
+    function openICModal() {
+      const m = icMeetingData;
+      document.getElementById('ic-edit-date').value = icMeetingDate;
+      const d = new Date(icMeetingDate + 'T12:00:00');
       document.getElementById('ic-modal-title').textContent = `IC Meeting — ${d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
-      document.getElementById('ic-edit-time').value = meeting.time || '2:00 PM';
-      document.getElementById('ic-edit-location').value = meeting.location || '';
-      document.getElementById('ic-edit-notes').value = meeting.notes || '';
+      document.getElementById('ic-edit-time').value = m.time || '2:00 PM';
+      document.getElementById('ic-edit-location').value = m.location || '';
+      document.getElementById('ic-edit-notes').value = m.notes || '';
 
       const agendaContainer = document.getElementById('ic-agenda-items');
       agendaContainer.innerHTML = '';
-      const items = (meeting.agenda && meeting.agenda.length) ? meeting.agenda : [''];
+      const items = (m.agenda && m.agenda.length) ? m.agenda : [''];
       items.forEach(item => addAgendaItem(item));
 
-      document.getElementById('ic-edit-modal').style.display = 'flex';
+      document.getElementById('ic-edit-modal').classList.add('visible');
     }
 
     function closeICModal() {
-      document.getElementById('ic-edit-modal').style.display = 'none';
+      document.getElementById('ic-edit-modal').classList.remove('visible');
     }
 
     function addAgendaItem(value = '') {
@@ -549,7 +545,7 @@
       row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;';
       row.innerHTML = `
         <input type="text" class="form-input ic-agenda-input" value="${value.replace(/"/g, '&quot;')}" placeholder="Agenda item..." style="flex:1;">
-        <button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:18px;padding:0 4px;">&times;</button>
+        <button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:18px;padding:0 4px;line-height:1;">&times;</button>
       `;
       container.appendChild(row);
     }
@@ -565,7 +561,8 @@
       const result = await Database.saveICMeeting(dateStr, { time, location, notes, agenda });
       if (result.success) {
         closeICModal();
-        await loadICMeetings();
+        icMeetingData = { ...icMeetingData, time, location, notes, agenda };
+        renderICMeetings();
         showToast('IC Meeting updated');
       } else {
         showToast('Error saving meeting', true);
