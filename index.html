@@ -467,6 +467,11 @@
       renderICMeetings();
     }
 
+    function normalizeAgenda(raw) {
+      if (!raw || !raw.length) return [];
+      return raw.map(item => typeof item === 'string' ? { text: item, link: '' } : item);
+    }
+
     function renderICMeetings() {
       const role = Auth.currentUserData?.role;
       const canEdit = role === 'Admin' || role === 'GP';
@@ -476,15 +481,16 @@
       if (canEdit) editBtn.style.display = '';
 
       if (!icMeetingDate) {
-        container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:8px;">Loading...</div>';
+        container.innerHTML = '<div style="text-align:center;color:#999;padding:8px;">Loading...</div>';
         return;
       }
 
-      const d = new Date(icMeetingDate + 'T12:00:00');
+      const parts = icMeetingDate.split('-');
+      const d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
       const dateLabel = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
       const time = icMeetingData.time || '2:00 PM';
       const loc = icMeetingData.location || '';
-      const agenda = icMeetingData.agenda || [];
+      const agenda = normalizeAgenda(icMeetingData.agenda);
       const notes = icMeetingData.notes || '';
 
       const today = new Date();
@@ -500,24 +506,30 @@
             </svg>
           </div>
           <div style="flex:1;">
-            <div style="font-size:14px;font-weight:600;color:var(--text-primary);">${dateLabel}</div>
-            <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">${time}${loc ? ' · ' + loc : ''} · <span style="color:var(--accent);font-weight:500;">${proximityLabel}</span></div>
+            <div style="font-size:15px;font-weight:700;color:#111;">${dateLabel}</div>
+            <div style="font-size:13px;color:#555;margin-top:2px;">${time}${loc ? ' · ' + loc : ''} · <span style="color:var(--accent);font-weight:600;">${proximityLabel}</span></div>
           </div>
         </div>
         ${agenda.length ? `
-          <div style="margin-bottom:${notes ? '12px' : '0'};">
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px;">Agenda</div>
+          <div style="margin-bottom:${notes ? '14px' : '0'};">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#999;margin-bottom:10px;">Agenda</div>
             ${agenda.map((a, i) => `
-              <div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;${i < agenda.length - 1 ? 'border-bottom:1px solid var(--border-color);' : ''}">
-                <span style="color:var(--accent);font-weight:600;font-size:12px;min-width:18px;">${i + 1}.</span>
-                <span style="font-size:13px;color:var(--text-secondary);line-height:1.4;">${a}</span>
+              <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;${i < agenda.length - 1 ? 'border-bottom:1px solid #f0f0f0;' : ''}">
+                <span style="color:var(--accent);font-weight:700;font-size:13px;min-width:20px;">${i + 1}.</span>
+                <div style="flex:1;min-width:0;">
+                  <span style="font-size:13px;color:#1a1a1a;line-height:1.5;">${a.text}</span>
+                  ${a.link ? `<a href="${a.link}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="display:inline-flex;align-items:center;gap:3px;margin-left:6px;font-size:11px;color:var(--accent);text-decoration:none;font-weight:500;">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    Doc
+                  </a>` : ''}
+                </div>
               </div>
             `).join('')}
           </div>
-        ` : '<div style="color:var(--text-muted);font-size:13px;font-style:italic;margin-bottom:' + (notes ? '12px' : '0') + ';">No agenda set yet</div>'}
+        ` : '<div style="color:#999;font-size:13px;font-style:italic;margin-bottom:' + (notes ? '14px' : '0') + ';">No agenda set yet</div>'}
         ${notes ? `
-          <div style="background:var(--bg-secondary);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--text-secondary);line-height:1.5;">
-            <span style="font-weight:600;color:var(--text-primary);">Notes:</span> ${notes}
+          <div style="background:#f8f8fa;border-radius:8px;padding:10px 14px;font-size:12px;color:#444;line-height:1.5;">
+            <span style="font-weight:700;color:#111;">Notes:</span> ${notes}
           </div>
         ` : ''}
       `;
@@ -528,7 +540,8 @@
     function openICModal() {
       const m = icMeetingData;
       document.getElementById('ic-edit-date').value = icMeetingDate;
-      const d = new Date(icMeetingDate + 'T12:00:00');
+      const parts = icMeetingDate.split('-');
+      const d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
       document.getElementById('ic-modal-title').textContent = `IC Meeting — ${d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
       document.getElementById('ic-edit-time').value = m.time || '2:00 PM';
       document.getElementById('ic-edit-location').value = m.location || '';
@@ -536,8 +549,12 @@
 
       const agendaContainer = document.getElementById('ic-agenda-items');
       agendaContainer.innerHTML = '';
-      const items = (m.agenda && m.agenda.length) ? m.agenda : [''];
-      items.forEach(item => addAgendaItem(item));
+      const items = normalizeAgenda(m.agenda);
+      if (items.length) {
+        items.forEach(item => addAgendaItem(item.text, item.link));
+      } else {
+        addAgendaItem('', '');
+      }
 
       document.getElementById('ic-edit-modal').classList.add('visible');
     }
@@ -546,13 +563,18 @@
       document.getElementById('ic-edit-modal').classList.remove('visible');
     }
 
-    function addAgendaItem(value = '') {
+    function addAgendaItem(text = '', link = '') {
       const container = document.getElementById('ic-agenda-items');
       const row = document.createElement('div');
-      row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;';
+      row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:8px;';
+      row.className = 'ic-agenda-row';
+      const esc = (s) => (s || '').replace(/"/g, '&quot;');
       row.innerHTML = `
-        <input type="text" class="form-input ic-agenda-input" value="${value.replace(/"/g, '&quot;')}" placeholder="Agenda item..." style="flex:1;">
-        <button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:18px;padding:0 4px;line-height:1;">&times;</button>
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+          <input type="text" class="form-input ic-agenda-text" value="${esc(text)}" placeholder="Agenda item...">
+          <input type="text" class="form-input ic-agenda-link" value="${esc(link)}" placeholder="Link to document (optional)" style="font-size:12px;padding:6px 10px;color:#666;">
+        </div>
+        <button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:18px;padding:0 4px;line-height:1;align-self:flex-start;margin-top:8px;">&times;</button>
       `;
       container.appendChild(row);
     }
@@ -562,8 +584,11 @@
       const time = document.getElementById('ic-edit-time').value.trim();
       const location = document.getElementById('ic-edit-location').value.trim();
       const notes = document.getElementById('ic-edit-notes').value.trim();
-      const agendaInputs = document.querySelectorAll('#ic-agenda-items .ic-agenda-input');
-      const agenda = Array.from(agendaInputs).map(i => i.value.trim()).filter(Boolean);
+      const rows = document.querySelectorAll('#ic-agenda-items .ic-agenda-row');
+      const agenda = Array.from(rows).map(row => ({
+        text: row.querySelector('.ic-agenda-text').value.trim(),
+        link: row.querySelector('.ic-agenda-link').value.trim()
+      })).filter(a => a.text);
 
       const result = await Database.saveICMeeting(dateStr, { time, location, notes, agenda });
       if (result.success) {
