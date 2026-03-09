@@ -247,11 +247,17 @@
         const timeout = ms => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms));
         
         [fundData, companiesData] = await Promise.all([
-          Promise.race([Database.getFund(), timeout(5000)]).catch(() => null),
-          Promise.race([Database.getCompanies(), timeout(5000)]).catch(() => [])
+          Promise.race([Database.getFund(), timeout(8000)]).catch(e => { console.error('Fund load failed:', e); return null; }),
+          Promise.race([Database.getCompanies(), timeout(8000)]).catch(e => { console.error('Companies load failed:', e); return []; })
         ]);
+        console.log('Data loaded — fund:', !!fundData, 'companies:', companiesData.length);
+        if (!fundData && companiesData.length === 0) {
+          console.warn('No data returned. Check Firestore rules and network.');
+          showToast('Unable to load portfolio data — check Firestore permissions', true);
+        }
       } catch (error) {
         console.error('Data loading error:', error);
+        showToast('Data loading error: ' + error.message, true);
         fundData = null;
         companiesData = [];
       }
