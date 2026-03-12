@@ -22,13 +22,29 @@ const Auth = {
                 lastLogin: firebase.firestore.FieldValue.serverTimestamp()
               });
             } else {
-              // User auth exists but profile doc was deleted from Firestore.
-              // Treat this as access revoked and force sign out.
-              this.currentUser = null;
-              this.currentUserData = null;
-              await firebaseAuth.signOut();
-              resolve(null);
-              return;
+              // No Firestore profile yet. If user signed in via Google,
+              // auto-create a basic profile so they aren't locked out.
+              const isGoogle = user.providerData?.some(p => p.providerId === 'google.com');
+              if (isGoogle) {
+                const newProfile = {
+                  email: user.email,
+                  name: user.displayName || user.email?.split('@')[0] || 'User',
+                  role: 'Team',
+                  title: '',
+                  assignedCompanies: [],
+                  createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                  lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                await firebaseDb.collection('users').doc(user.uid).set(newProfile);
+                this.currentUserData = { id: user.uid, ...newProfile };
+              } else {
+                // Password-only user with no profile = access revoked
+                this.currentUser = null;
+                this.currentUserData = null;
+                await firebaseAuth.signOut();
+                resolve(null);
+                return;
+              }
             }
           } catch (error) {
             console.error('Error fetching user data:', error);

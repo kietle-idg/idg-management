@@ -75,9 +75,10 @@
   <script src="auth.js"></script>
 
   <script>
-    // Check if already logged in
+    // Check if already logged in (skip redirect while Google sign-in is in progress)
+    let googleSignInInProgress = false;
     firebaseAuth.onAuthStateChanged((user) => {
-      if (user) {
+      if (user && !googleSignInInProgress) {
         window.location.href = 'index.html';
       }
     });
@@ -132,6 +133,7 @@
       errorEl.textContent = '';
       errorEl.classList.remove('visible');
       btnEl.disabled = true;
+      googleSignInInProgress = true;
 
       try {
         const provider = new firebase.auth.GoogleAuthProvider();
@@ -207,6 +209,7 @@
         window.location.href = 'index.html';
       } catch (error) {
         console.error('Google sign-in error:', error);
+        googleSignInInProgress = false;
         errorEl.textContent = error.message || 'Google sign-in failed. Please try again.';
         errorEl.classList.add('visible');
         btnEl.disabled = false;
