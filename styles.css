@@ -1505,6 +1505,29 @@ tr:hover td {
   30% { transform: translateY(-6px); opacity: 1; }
 }
 
+.chat-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 12px 10px;
+}
+
+.chat-suggestion-btn {
+  background: #f0f2f5;
+  border: 1px solid #d0d5dd;
+  border-radius: 16px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: #344054;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.chat-suggestion-btn:hover {
+  background: #e4e7ec;
+  border-color: #98a2b3;
+}
+
 /* Responsive */
 @media (max-width: 480px) {
   #chat-panel {

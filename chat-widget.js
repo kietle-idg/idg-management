@@ -113,12 +113,61 @@
     return 0;
   }
 
+  // ── IC Meeting helpers ──
+  function getNextFriday() {
+    const d = new Date();
+    let diff = (5 - d.getDay() + 7) % 7;
+    d.setDate(d.getDate() + diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  function toLocalDateStr(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  function buildICMeetingContext(meeting, dateStr) {
+    if (!meeting || !meeting.agenda || !meeting.agenda.length) return '';
+
+    const parts = dateStr.split('-');
+    const d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+    const label = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+    let ctx = `\nUPCOMING IC MEETING — ${label}\n`;
+    ctx += `Time: ${meeting.time || '2:00 PM'}\n`;
+    if (meeting.location) ctx += `Location: ${meeting.location}\n`;
+    ctx += `Agenda:\n`;
+
+    const agenda = (meeting.agenda || []).map(a => typeof a === 'string' ? { text: a, link: '' } : a);
+    agenda.forEach((item, i) => {
+      ctx += `  ${i + 1}. ${item.text}`;
+      if (item.link) ctx += ` [Document: ${item.link}]`;
+      ctx += '\n';
+    });
+
+    if (meeting.notes) ctx += `Notes: ${meeting.notes}\n`;
+    ctx += '\n';
+    return ctx;
+  }
+
   // ── Load data from Firestore ──
   async function loadPortfolioContext() {
     try {
       const companies = await Database.getCompanies();
       const fund = await Database.getFund();
-      portfolioContext = buildContext(companies || [], fund);
+      let ctx = buildContext(companies || [], fund);
+
+      // Append IC meeting agenda if available
+      try {
+        const fri = getNextFriday();
+        const dateStr = toLocalDateStr(fri);
+        const meeting = await Database.getICMeeting(dateStr);
+        ctx += buildICMeetingContext(meeting, dateStr);
+      } catch (e) {
+        console.warn('Chat: could not load IC meeting', e);
+      }
+
+      portfolioContext = ctx;
       return true;
     } catch (e) {
       console.error('Chat: failed to load portfolio data', e);
@@ -178,7 +227,12 @@
       </div>
       <div class="chat-messages" id="chat-messages">
         <div class="chat-msg chat-msg-ai">
-          <div class="chat-msg-content">Hi! I can answer questions about your portfolio. Try asking about company valuations, MOICs, sectors, or latest updates.</div>
+          <div class="chat-msg-content">Hi! I can answer questions about your portfolio, and review deals on the upcoming IC agenda.</div>
+        </div>
+        <div class="chat-suggestions" id="chat-suggestions">
+          <button class="chat-suggestion-btn" data-prompt="Review the deals on this week's IC agenda">IC Agenda Review</button>
+          <button class="chat-suggestion-btn" data-prompt="What is our current fund MOIC and top performing companies?">Fund Performance</button>
+          <button class="chat-suggestion-btn" data-prompt="Which portfolio companies have the highest MOIC?">Top MOICs</button>
         </div>
       </div>
       <form class="chat-input-bar" id="chat-form">
@@ -194,6 +248,18 @@
     btn.addEventListener('click', toggleChat);
     panel.querySelector('.chat-close').addEventListener('click', toggleChat);
     document.getElementById('chat-form').addEventListener('submit', handleSubmit);
+
+    // Suggestion buttons
+    panel.querySelectorAll('.chat-suggestion-btn').forEach(b => {
+      b.addEventListener('click', () => {
+        const prompt = b.getAttribute('data-prompt');
+        if (prompt && !isLoading) {
+          document.getElementById('chat-input').value = prompt;
+          document.getElementById('chat-form').dispatchEvent(new Event('submit'));
+          document.getElementById('chat-suggestions').style.display = 'none';
+        }
+      });
+    });
   }
 
   function toggleChat() {
