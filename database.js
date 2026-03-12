@@ -12,6 +12,9 @@ const Database = {
       return doc.exists ? doc.data() : null;
     } catch (error) {
       console.error('Error getting fund:', error);
+      if (error.code === 'permission-denied') {
+        alert('Firestore permission denied. Your security rules may have expired.\n\nGo to: Firebase Console → Firestore → Rules\nand update the expiration date or use: allow read, write: if request.auth != null;');
+      }
       return null;
     }
   },

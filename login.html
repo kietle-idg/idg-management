@@ -118,6 +118,13 @@
       }
     });
 
+    const ALLOWED_GOOGLE_DOMAIN = 'idgcapitalvietnam.com';
+
+    function isAllowedGoogleEmail(email) {
+      const value = (email || '').toLowerCase().trim();
+      return value.endsWith(`@${ALLOWED_GOOGLE_DOMAIN}`);
+    }
+
     // Google Sign-In handler
     async function signInWithGoogle() {
       const errorEl = document.getElementById('login-error');
@@ -128,10 +135,62 @@
 
       try {
         const provider = new firebase.auth.GoogleAuthProvider();
-        const result = await firebaseAuth.signInWithPopup(provider);
+        provider.setCustomParameters({
+          hd: ALLOWED_GOOGLE_DOMAIN,
+          prompt: 'select_account'
+        });
+
+        let result;
+        try {
+          result = await firebaseAuth.signInWithPopup(provider);
+        } catch (popupError) {
+          // If email already has a password account, auto-link via redirect approach
+          if (popupError.code === 'auth/account-exists-with-different-credential') {
+            const email = popupError.customData?.email || popupError.email;
+            if (!isAllowedGoogleEmail(email)) {
+              throw new Error(`Please sign in with your @${ALLOWED_GOOGLE_DOMAIN} Google account.`);
+            }
+
+            const pendingCred = firebase.auth.GoogleAuthProvider.credentialFromError
+              ? firebase.auth.GoogleAuthProvider.credentialFromError(popupError)
+              : popupError.credential;
+
+            // Show a password prompt to link the accounts
+            const password = prompt(
+              `Your email "${email}" already has a password account.\n\n` +
+              `Enter your password to link Google sign-in to your account.\n` +
+              `(You only need to do this once — after that, Google login will work directly.)`
+            );
+
+            if (!password) {
+              btnEl.disabled = false;
+              return;
+            }
+
+            const existingUser = await firebaseAuth.signInWithEmailAndPassword(email, password);
+            if (pendingCred) {
+              await existingUser.user.linkWithCredential(pendingCred);
+            }
+            result = existingUser;
+          } else if (popupError.code === 'auth/popup-blocked') {
+            throw new Error('Pop-up was blocked by your browser. Please allow pop-ups for this site and try again.');
+          } else if (popupError.code === 'auth/popup-closed-by-user' || popupError.code === 'auth/cancelled-popup-request') {
+            btnEl.disabled = false;
+            return;
+          } else {
+            throw popupError;
+          }
+        }
+
         const user = result.user;
 
-        // Check if user doc exists in Firestore, if not create one
+        // Enforce domain
+        if (!isAllowedGoogleEmail(user?.email)) {
+          await firebaseAuth.signOut();
+          throw new Error(`Please sign in with your @${ALLOWED_GOOGLE_DOMAIN} Google account.`);
+        }
+
+        // Ensure user doc exists in Firestore
         const userDoc = await firebaseDb.collection('users').doc(user.uid).get();
         if (!userDoc.exists) {
           await firebaseDb.collection('users').doc(user.uid).set({
