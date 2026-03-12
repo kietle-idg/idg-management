@@ -126,23 +126,53 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
-  function buildICMeetingContext(meeting, dateStr) {
+  async function fetchDocContent(links) {
+    try {
+      const resp = await fetch('/api/fetch-docs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ links })
+      });
+      const data = await resp.json();
+      if (data.success && data.documents) return data.documents;
+    } catch (e) {
+      console.warn('Chat: failed to fetch doc content', e);
+    }
+    return [];
+  }
+
+  async function buildICMeetingContext(meeting, dateStr) {
     if (!meeting || !meeting.agenda || !meeting.agenda.length) return '';
 
     const parts = dateStr.split('-');
     const d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
     const label = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
+    const agenda = (meeting.agenda || []).map(a => typeof a === 'string' ? { text: a, link: '' } : a);
+
+    // Fetch document content for items with Drive links
+    const linksToFetch = agenda.map(a => a.link).filter(Boolean);
+    let docResults = [];
+    if (linksToFetch.length > 0) {
+      docResults = await fetchDocContent(linksToFetch);
+    }
+    const docByUrl = {};
+    docResults.forEach(d => { if (d.content) docByUrl[d.url] = d.content; });
+
     let ctx = `\nUPCOMING IC MEETING — ${label}\n`;
     ctx += `Time: ${meeting.time || '2:00 PM'}\n`;
     if (meeting.location) ctx += `Location: ${meeting.location}\n`;
     ctx += `Agenda:\n`;
 
-    const agenda = (meeting.agenda || []).map(a => typeof a === 'string' ? { text: a, link: '' } : a);
     agenda.forEach((item, i) => {
       ctx += `  ${i + 1}. ${item.text}`;
-      if (item.link) ctx += ` [Document: ${item.link}]`;
+      if (item.link) ctx += ` [Dataroom: ${item.link}]`;
       ctx += '\n';
+      if (item.link && docByUrl[item.link]) {
+        ctx += `\n  === DOCUMENT CONTENT FOR "${item.text}" ===\n`;
+        ctx += docByUrl[item.link];
+        ctx += `\n  === END DOCUMENT CONTENT ===\n\n`;
+      }
     });
 
     if (meeting.notes) ctx += `Notes: ${meeting.notes}\n`;
@@ -157,12 +187,12 @@
       const fund = await Database.getFund();
       let ctx = buildContext(companies || [], fund);
 
-      // Append IC meeting agenda if available
+      // Append IC meeting agenda + document content if available
       try {
         const fri = getNextFriday();
         const dateStr = toLocalDateStr(fri);
         const meeting = await Database.getICMeeting(dateStr);
-        ctx += buildICMeetingContext(meeting, dateStr);
+        ctx += await buildICMeetingContext(meeting, dateStr);
       } catch (e) {
         console.warn('Chat: could not load IC meeting', e);
       }

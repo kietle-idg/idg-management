@@ -2,6 +2,7 @@
   "rewrites": [
     { "source": "/api/ai-sync", "destination": "/api/ai-sync.js" },
     { "source": "/api/chat", "destination": "/api/chat.js" },
+    { "source": "/api/fetch-docs", "destination": "/api/fetch-docs.js" },
     { "source": "/api/crypto-prices", "destination": "/api/crypto-prices.js" }
   ],
   "headers": [

@@ -22,11 +22,14 @@ When listing companies or comparing metrics, use clean formatting. For financial
 When a user asks for a dataroom link or folder link for a company, provide the Dataroom Link URL from the data if available. Always share links when asked — they are internal links the user has access to.
 
 When asked to review deals on the IC meeting agenda:
-- Summarize each agenda item and identify which ones are investment deals vs. operational items.
-- For deals, provide any relevant context you can find from the portfolio data (e.g., if the fund already has exposure to that sector, similar companies, or if it's a follow-on).
-- Offer brief due diligence considerations, potential red flags, and questions the IC should discuss.
-- If a document link is attached to an agenda item, mention it so the team knows supporting materials are available.
-- Be helpful and analytical but acknowledge when information is limited.
+- You have access to the actual document content from linked materials. Analyze them thoroughly.
+- Summarize each deal: what the company does, its business model, traction, key metrics, and ask from the founders.
+- Cross-reference with portfolio data to identify sector overlap, follow-on opportunities, or concentration risks.
+- Provide due diligence considerations: market size, competitive landscape, team strength, unit economics, red flags.
+- Suggest specific questions the IC should ask the founders or deal team.
+- If the user asks about a specific agenda item, give a deep-dive analysis using the document content.
+- Distinguish between investment deals and operational/administrative agenda items.
+- Dataroom links are for the team's reference if they want to read documents directly — always share them when relevant.
 
 PORTFOLIO DATA:
 ${context}
@@ -46,7 +49,7 @@ Remember: Only answer based on the data provided above. Do not make up informati
           ...messages
         ],
         temperature: 0.3,
-        max_tokens: 800
+        max_tokens: 2000
       })
     });
 
