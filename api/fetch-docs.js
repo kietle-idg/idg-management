@@ -15,22 +15,18 @@ function getGoogleAuth() {
 function parseDriveUrl(url) {
   if (!url || typeof url !== 'string') return null;
 
-  // Google Drive folder: /drive/folders/ID or /drive/u/0/folders/ID
   let m = url.match(/\/folders\/([a-zA-Z0-9_-]+)/);
   if (m) return { type: 'folder', id: m[1] };
 
-  // Google Docs/Sheets/Slides: /document/d/ID or /spreadsheets/d/ID or /presentation/d/ID
   m = url.match(/\/(document|spreadsheets|presentation)\/d\/([a-zA-Z0-9_-]+)/);
   if (m) {
     const typeMap = { document: 'doc', spreadsheets: 'sheet', presentation: 'slides' };
     return { type: typeMap[m[1]], id: m[2] };
   }
 
-  // Google Drive file: /file/d/ID
   m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
   if (m) return { type: 'file', id: m[1] };
 
-  // Direct Drive ID (e.g., just the ID string)
   m = url.match(/^([a-zA-Z0-9_-]{20,})$/);
   if (m) return { type: 'file', id: m[1] };
 
@@ -39,7 +35,7 @@ function parseDriveUrl(url) {
 
 async function getFileContent(drive, file) {
   const mimeType = file.mimeType;
-  const MAX_CHARS = 8000;
+  const MAX_CHARS = 6000;
 
   if (mimeType === 'application/vnd.google-apps.document') {
     const res = await drive.files.export({ fileId: file.id, mimeType: 'text/plain' });
@@ -63,7 +59,10 @@ async function getFileContent(drive, file) {
   }
 
   if (mimeType === 'application/pdf') {
-    const res = await drive.files.get({ fileId: file.id, alt: 'media' }, { responseType: 'arraybuffer' });
+    const res = await drive.files.get(
+      { fileId: file.id, alt: 'media' },
+      { responseType: 'arraybuffer' }
+    );
     const buffer = Buffer.from(res.data);
     const pdf = await pdfParse(buffer);
     const text = (pdf.text || '').substring(0, MAX_CHARS);
@@ -71,6 +70,52 @@ async function getFileContent(drive, file) {
   }
 
   return null;
+}
+
+async function fetchFolder(drive, folderId, url) {
+  const fileList = await drive.files.list({
+    q: `'${folderId}' in parents and trashed=false and mimeType!='application/vnd.google-apps.folder'`,
+    fields: 'files(id, name, mimeType, modifiedTime)',
+    orderBy: 'modifiedTime desc',
+    pageSize: 4,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true
+  });
+
+  const files = fileList.data.files || [];
+  if (files.length === 0) {
+    return { url, content: null, fileCount: 0, note: 'Folder empty or no readable files' };
+  }
+
+  let content = '';
+  for (const f of files) {
+    try {
+      const text = await getFileContent(drive, f);
+      if (text) content += `\n--- ${f.name} ---\n${text}\n`;
+    } catch (e) {
+      console.error(`Error reading ${f.name}:`, e.message);
+    }
+  }
+
+  return { url, content: content || null, fileCount: files.length };
+}
+
+async function fetchSingleFile(drive, parsed, url) {
+  let mimeType;
+  if (parsed.type === 'doc') mimeType = 'application/vnd.google-apps.document';
+  else if (parsed.type === 'sheet') mimeType = 'application/vnd.google-apps.spreadsheet';
+  else if (parsed.type === 'slides') mimeType = 'application/vnd.google-apps.presentation';
+  else {
+    const meta = await drive.files.get({
+      fileId: parsed.id,
+      fields: 'id,name,mimeType',
+      supportsAllDrives: true
+    });
+    mimeType = meta.data.mimeType;
+  }
+
+  const text = await getFileContent(drive, { id: parsed.id, mimeType });
+  return { url, content: text || null };
 }
 
 module.exports = async function handler(req, res) {
@@ -89,72 +134,39 @@ module.exports = async function handler(req, res) {
 
     const auth = getGoogleAuth();
     const drive = google.drive({ version: 'v3', auth });
-    const results = [];
-    const TOTAL_CHAR_LIMIT = 40000;
-    let totalChars = 0;
 
-    for (const url of links.slice(0, 10)) {
-      if (totalChars >= TOTAL_CHAR_LIMIT) break;
-
+    // Process all links in parallel for speed
+    const promises = links.slice(0, 8).map(async (url) => {
       const parsed = parseDriveUrl(url);
-      if (!parsed) {
-        results.push({ url, content: null, error: 'Could not parse Drive URL' });
-        continue;
-      }
+      if (!parsed) return { url, content: null, error: 'Could not parse Drive URL' };
 
       try {
         if (parsed.type === 'folder') {
-          const fileList = await drive.files.list({
-            q: `'${parsed.id}' in parents and trashed=false and mimeType!='application/vnd.google-apps.folder'`,
-            fields: 'files(id, name, mimeType, modifiedTime)',
-            orderBy: 'modifiedTime desc',
-            pageSize: 8
-          });
-
-          const files = fileList.data.files || [];
-          let folderContent = '';
-
-          for (const f of files) {
-            if (totalChars + folderContent.length >= TOTAL_CHAR_LIMIT) break;
-            try {
-              const text = await getFileContent(drive, f);
-              if (text) {
-                folderContent += `\n--- ${f.name} ---\n${text}\n`;
-              }
-            } catch (e) {
-              console.error(`Error reading ${f.name}:`, e.message);
-            }
-          }
-
-          totalChars += folderContent.length;
-          results.push({
-            url,
-            fileCount: files.length,
-            content: folderContent || null
-          });
-
+          return await fetchFolder(drive, parsed.id, url);
         } else {
-          // Single file — get metadata first to know the mimeType
-          let mimeType;
-          if (parsed.type === 'doc') mimeType = 'application/vnd.google-apps.document';
-          else if (parsed.type === 'sheet') mimeType = 'application/vnd.google-apps.spreadsheet';
-          else if (parsed.type === 'slides') mimeType = 'application/vnd.google-apps.presentation';
-          else {
-            const meta = await drive.files.get({ fileId: parsed.id, fields: 'id,name,mimeType' });
-            mimeType = meta.data.mimeType;
-          }
-
-          const text = await getFileContent(drive, { id: parsed.id, mimeType });
-          totalChars += (text || '').length;
-          results.push({ url, content: text || null });
+          return await fetchSingleFile(drive, parsed, url);
         }
       } catch (e) {
         console.error(`Error fetching ${url}:`, e.message);
-        results.push({ url, content: null, error: e.message });
+        return { url, content: null, error: e.message };
       }
-    }
+    });
 
-    return res.status(200).json({ success: true, documents: results });
+    const results = await Promise.all(promises);
+
+    const hasAnyContent = results.some(r => r.content);
+    const errors = results.filter(r => r.error).map(r => r.error);
+
+    return res.status(200).json({
+      success: true,
+      documents: results,
+      summary: {
+        total: results.length,
+        withContent: results.filter(r => r.content).length,
+        errors: errors.length,
+        errorMessages: errors.length ? errors : undefined
+      }
+    });
 
   } catch (error) {
     console.error('Fetch docs error:', error);

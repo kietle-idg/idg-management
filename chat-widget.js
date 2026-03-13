@@ -133,12 +133,17 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ links })
       });
+      if (!resp.ok) {
+        console.error('Chat: fetch-docs returned', resp.status);
+        return { documents: [], error: `HTTP ${resp.status}` };
+      }
       const data = await resp.json();
-      if (data.success && data.documents) return data.documents;
+      console.log('Chat: fetch-docs result', data.summary || data);
+      return data;
     } catch (e) {
-      console.warn('Chat: failed to fetch doc content', e);
+      console.error('Chat: failed to fetch doc content', e);
+      return { documents: [], error: e.message };
     }
-    return [];
   }
 
   async function buildICMeetingContext(meeting, dateStr) {
@@ -152,16 +157,27 @@
 
     // Fetch document content for items with Drive links
     const linksToFetch = agenda.map(a => a.link).filter(Boolean);
-    let docResults = [];
+    let docByUrl = {};
+    let docLoadNote = '';
+
     if (linksToFetch.length > 0) {
-      docResults = await fetchDocContent(linksToFetch);
+      const result = await fetchDocContent(linksToFetch);
+      const docs = result.documents || [];
+      docs.forEach(d => { if (d.content) docByUrl[d.url] = d.content; });
+
+      const loaded = Object.keys(docByUrl).length;
+      const errors = docs.filter(d => d.error);
+      if (loaded === 0 && errors.length > 0) {
+        docLoadNote = `(Note: Could not read document content — the service account may not have access to these folders. Errors: ${errors.map(e => e.error).join('; ')})\n`;
+      } else if (loaded < linksToFetch.length) {
+        docLoadNote = `(Note: Loaded document content for ${loaded} of ${linksToFetch.length} agenda items. Some folders may not be accessible.)\n`;
+      }
     }
-    const docByUrl = {};
-    docResults.forEach(d => { if (d.content) docByUrl[d.url] = d.content; });
 
     let ctx = `\nUPCOMING IC MEETING — ${label}\n`;
     ctx += `Time: ${meeting.time || '2:00 PM'}\n`;
     if (meeting.location) ctx += `Location: ${meeting.location}\n`;
+    if (docLoadNote) ctx += docLoadNote;
     ctx += `Agenda:\n`;
 
     agenda.forEach((item, i) => {
