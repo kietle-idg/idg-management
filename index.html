@@ -121,6 +121,19 @@
             </div>
           </div>
 
+          <!-- Deal Pipeline -->
+          <div id="pipeline-section" class="card mb-8">
+            <div class="card-header">
+              <h3 class="card-title">Deal Pipeline</h3>
+              <span id="pipeline-edit-btn" style="display:none;cursor:pointer;color:var(--text-muted);" title="Edit pipeline link" onclick="openPipelineModal()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </span>
+            </div>
+            <div class="card-body" id="pipeline-card" style="padding:20px;">
+              <div style="text-align:center;color:#999;font-size:13px;">Loading...</div>
+            </div>
+          </div>
+
           <!-- Two Column Layout -->
           <div class="grid-2">
             <!-- Top Companies -->
@@ -158,19 +171,6 @@
                 </div>
               </div>
               <div class="card-body" id="ic-meeting-card" style="padding:20px;"></div>
-            </div>
-          </div>
-
-          <!-- Deal Pipeline -->
-          <div id="pipeline-section" class="card mb-8" style="margin-top:24px;">
-            <div class="card-header">
-              <h3 class="card-title">Deal Pipeline</h3>
-              <span id="pipeline-edit-btn" style="display:none;cursor:pointer;color:var(--text-muted);" title="Edit pipeline link" onclick="openPipelineModal()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              </span>
-            </div>
-            <div class="card-body" id="pipeline-card" style="padding:20px;">
-              <div style="text-align:center;color:#999;font-size:13px;">Loading...</div>
             </div>
           </div>
 
