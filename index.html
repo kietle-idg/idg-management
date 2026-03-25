@@ -19,7 +19,10 @@
           <span>IDGX Capital</span>
         </a>
         
-        <div class="navbar-nav">
+        <button class="mobile-menu-btn" onclick="document.querySelector('.navbar-nav').classList.toggle('mobile-open')" aria-label="Menu">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div class="navbar-nav" id="navbar-nav">
           <a href="index.html" class="nav-link active">Dashboard</a>
           <a href="portfolio.html" class="nav-link" id="nav-portfolio">Portfolio</a>
           <a href="personal.html" class="nav-link">My View</a>
@@ -761,8 +764,12 @@
 
       if (canEdit) editBtn.style.display = '';
 
-      const url = fundData?.pipelineUrl || '';
+      let url = fundData?.pipelineUrl || '';
       const label = fundData?.pipelineLabel || '';
+
+      if (url && !url.match(/^https?:\/\//)) {
+        url = 'https://' + url;
+      }
 
       if (!url) {
         card.innerHTML = canEdit

@@ -1242,8 +1242,55 @@ tr:hover td {
 @media (max-width: 768px) {
   .navbar-nav {
     display: none;
+    position: absolute;
+    top: 64px;
+    left: 0;
+    right: 0;
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border);
+    flex-direction: column;
+    padding: 8px 16px 12px;
+    gap: 2px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.08);
+    z-index: 99;
   }
-  
+
+  .navbar-nav.mobile-open {
+    display: flex;
+  }
+
+  .navbar-nav .nav-link {
+    padding: 10px 12px;
+    width: 100%;
+    text-align: left;
+    font-size: 15px;
+  }
+
+  .mobile-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    border-radius: var(--radius);
+  }
+
+  .mobile-menu-btn:hover {
+    background: var(--bg-hover);
+  }
+
+  .navbar-inner {
+    position: relative;
+  }
+
+  .navbar-user span {
+    display: none;
+  }
+
   .metrics {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1255,6 +1302,10 @@ tr:hover td {
   .container {
     padding: 0 var(--space-4);
   }
+}
+
+.mobile-menu-btn {
+  display: none;
 }
 
 /* ============================================
