@@ -620,7 +620,7 @@
           </div>
           <div style="flex:1;">
             <div style="font-size:15px;font-weight:700;color:#111;">${dateLabel}</div>
-            <div style="font-size:13px;color:#555;margin-top:2px;">${time}${loc ? ' · ' + loc : ''} · <span style="color:${isPast ? '#888' : 'var(--accent)'};font-weight:600;">${proximityLabel}</span></div>
+            <div style="font-size:13px;color:#555;margin-top:2px;">${time}${loc ? ' · ' + (loc.match(/^https?:\/\//) ? `<a href="${loc}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;word-break:break-all;">${loc}</a>` : loc) : ''} · <span style="color:${isPast ? '#888' : 'var(--accent)'};font-weight:600;">${proximityLabel}</span></div>
           </div>
         </div>
         ${hasData ? `
