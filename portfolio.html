@@ -622,10 +622,28 @@
       const canEdit = Auth.currentUserData?.role === 'Admin' || Auth.currentUserData?.role === 'Team';
       
       const html = companies.map(c => {
-        const hasDetails = c.description || c.aiUpdates?.length || c.aiHighlights?.length;
+        const hasDetails = c.description || c.aiUpdates?.length || c.aiHighlights?.length || c.webUpdates?.length;
         const updatesHtml = (c.aiUpdates || []).map(u => `<li style="margin-bottom: 4px;">${u}</li>`).join('');
         const highlightsHtml = (c.aiHighlights || []).map(h => `<li style="margin-bottom: 4px;">${h}</li>`).join('');
         const metricsHtml = c.aiKeyMetrics ? Object.entries(c.aiKeyMetrics).map(([k,v]) => `<span style="display:inline-block;background:var(--bg-secondary);padding:4px 10px;border-radius:6px;margin:2px 4px 2px 0;font-size:12px;"><strong>${k}:</strong> ${v}</span>`).join('') : '';
+
+        const categoryIcons = { funding: '💰', product: '🚀', partnership: '🤝', hiring: '👥', media: '📰', social: '🐦', other: '📌' };
+        const webUpdatesHtml = (c.webUpdates || []).map(w => {
+          const icon = categoryIcons[w.category] || '📌';
+          const sourceLabel = w.source || new URL(w.url || 'https://unknown').hostname;
+          return `<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.04);">
+            <span style="font-size:14px;flex-shrink:0;">${icon}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;color:var(--text-primary);line-height:1.5;">${w.text}</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
+                ${w.url ? `<a href="${w.url}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;">${sourceLabel}</a>` : sourceLabel}
+                ${w.date ? ` · ${w.date}` : ''}
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+
+        const sentimentColor = c.webSentiment === 'positive' ? 'var(--success)' : c.webSentiment === 'negative' ? 'var(--danger)' : c.webSentiment === 'mixed' ? '#f59e0b' : 'var(--text-muted)';
 
         return `
         <tr>
@@ -681,7 +699,7 @@
                 </div>
                 <div>
                   ${updatesHtml ? `
-                    <h4 style="margin:0 0 8px;font-size:14px;color:var(--text-primary);">📰 Latest Updates</h4>
+                    <h4 style="margin:0 0 8px;font-size:14px;color:var(--text-primary);">📰 Dataroom Updates</h4>
                     <ul style="color:var(--text-secondary);padding-left:20px;font-size:13px;margin:0;">${updatesHtml}</ul>
                   ` : '<p style="color:var(--text-muted);font-size:13px;margin:0;"><em>No updates yet. Run AI Sync to extract from documents.</em></p>'}
                   <div style="margin-top:16px;">
@@ -695,6 +713,17 @@
                   ` : ''}
                 </div>
               </div>
+              ${webUpdatesHtml || c.webTrendingSummary ? `
+              <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                  <h4 style="margin:0;font-size:14px;color:var(--text-primary);">🌐 Web Intelligence</h4>
+                  ${c.webSentiment ? `<span style="font-size:11px;font-weight:600;color:${sentimentColor};background:${sentimentColor}15;padding:2px 8px;border-radius:4px;text-transform:capitalize;">${c.webSentiment}</span>` : ''}
+                </div>
+                ${c.webTrendingSummary ? `<p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px;line-height:1.5;font-style:italic;">${c.webTrendingSummary}</p>` : ''}
+                ${webUpdatesHtml ? `<div>${webUpdatesHtml}</div>` : ''}
+                ${c.lastWebResearch ? `<p style="margin-top:10px;font-size:11px;color:var(--text-muted);">🌐 Last web research: ${new Date(c.lastWebResearch).toLocaleString()}</p>` : ''}
+              </div>
+              ` : ''}
             </div>
           </td>
         </tr>
@@ -1137,6 +1166,26 @@
     }
 
     // ========================
+    // WEB RESEARCH HELPER
+    // ========================
+    async function runWebResearch(companyName, website) {
+      try {
+        const resp = await fetch('/api/web-research', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ companyName, website: website || undefined })
+        });
+        const data = await resp.json();
+        if (data.success && data.data) return data.data;
+        console.warn('Web research returned no data for', companyName);
+        return null;
+      } catch (err) {
+        console.warn('Web research failed for', companyName, err.message);
+        return null;
+      }
+    }
+
+    // ========================
     // AI SYNC FROM GOOGLE DRIVE
     // ========================
     async function aiSync() {
@@ -1204,13 +1253,23 @@
               if (aiData.keyMetrics) updateData.aiKeyMetrics = aiData.keyMetrics;
               updateData.lastAiSync = new Date().toISOString();
 
+              // Web research: search for latest public updates
+              btnText.textContent = `🌐 ${processed}/${totalFolders}: ${cleanName}`;
+              const webData = await runWebResearch(cleanName, existing.website);
+              if (webData) {
+                if (webData.webUpdates?.length) updateData.webUpdates = webData.webUpdates;
+                if (webData.sentiment) updateData.webSentiment = webData.sentiment;
+                if (webData.trendingSummary) updateData.webTrendingSummary = webData.trendingSummary;
+                updateData.lastWebResearch = new Date().toISOString();
+              }
+
               if (Object.keys(updateData).length > 0) {
                 await Database.updateCompany(existing.id, updateData);
                 updated++;
               }
             } else {
               // Create new company
-              await Database.createCompany({
+              const newCompanyData = {
                 name: cleanName,
                 description: aiData.description || null,
                 sector: aiData.sector || '-',
@@ -1222,9 +1281,20 @@
                 aiHighlights: aiData.highlights || [],
                 aiKeyMetrics: aiData.keyMetrics || null,
                 lastAiSync: new Date().toISOString()
-              });
+              };
+
+              // Web research for new company too
+              btnText.textContent = `🌐 ${processed}/${totalFolders}: ${cleanName}`;
+              const webData = await runWebResearch(cleanName);
+              if (webData) {
+                if (webData.webUpdates?.length) newCompanyData.webUpdates = webData.webUpdates;
+                if (webData.sentiment) newCompanyData.webSentiment = webData.sentiment;
+                if (webData.trendingSummary) newCompanyData.webTrendingSummary = webData.trendingSummary;
+                newCompanyData.lastWebResearch = new Date().toISOString();
+              }
+
+              await Database.createCompany(newCompanyData);
               created++;
-              // Reload so next folders can match this new company (avoid duplicates)
               companiesData = await Database.getCompanies();
             }
           } catch (err) {
