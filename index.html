@@ -206,14 +206,26 @@
                   <button onclick="closeICModal()" class="modal-close">&times;</button>
                 </div>
                 <div class="modal-body">
-                  <input type="hidden" id="ic-edit-date">
-                  <div style="margin-bottom:16px;">
-                    <label class="form-label">Time</label>
-                    <input type="text" class="form-input" id="ic-edit-time" placeholder="e.g. 2:00 PM">
+                  <input type="hidden" id="ic-edit-original-date">
+                  <div style="display:flex;gap:12px;margin-bottom:16px;">
+                    <div style="flex:1;">
+                      <label class="form-label">Title</label>
+                      <input type="text" class="form-input" id="ic-edit-title" placeholder="Weekly IC Meeting">
+                    </div>
+                    <div style="flex:0 0 160px;">
+                      <label class="form-label">Date</label>
+                      <input type="date" class="form-input" id="ic-edit-date">
+                    </div>
                   </div>
-                  <div style="margin-bottom:16px;">
-                    <label class="form-label">Location / Link</label>
-                    <input type="text" class="form-input" id="ic-edit-location" placeholder="e.g. Conference Room A or Zoom link">
+                  <div style="display:flex;gap:12px;margin-bottom:16px;">
+                    <div style="flex:1;">
+                      <label class="form-label">Time</label>
+                      <input type="text" class="form-input" id="ic-edit-time" placeholder="e.g. 2:00 PM">
+                    </div>
+                    <div style="flex:1;">
+                      <label class="form-label">Location / Link</label>
+                      <input type="text" class="form-input" id="ic-edit-location" placeholder="e.g. Zoom link or room">
+                    </div>
                   </div>
                   <div style="margin-bottom:16px;">
                     <label class="form-label">Agenda</label>
@@ -548,11 +560,12 @@
       const parts = icMeetingDate.split('-');
       const d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
       const dateLabel = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+      const title = icMeetingData.title || '';
       const time = icMeetingData.time || '2:00 PM';
       const loc = icMeetingData.location || '';
       const agenda = normalizeAgenda(icMeetingData.agenda);
       const notes = icMeetingData.notes || '';
-      const hasData = agenda.length > 0 || notes;
+      const hasData = agenda.length > 0 || notes || title;
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -574,6 +587,7 @@
             </svg>
           </div>
           <div style="flex:1;">
+            ${title ? `<div style="font-size:14px;font-weight:700;color:var(--accent);margin-bottom:2px;">${title}</div>` : ''}
             <div style="font-size:15px;font-weight:700;color:#111;">${dateLabel}</div>
             <div style="font-size:13px;color:#555;margin-top:2px;">${time}${loc ? ' · ' + loc : ''} · <span style="color:${isPast ? '#888' : 'var(--accent)'};font-weight:600;">${proximityLabel}</span></div>
           </div>
@@ -614,10 +628,10 @@
 
     function openICModal() {
       const m = icMeetingData;
+      document.getElementById('ic-edit-original-date').value = icMeetingDate;
       document.getElementById('ic-edit-date').value = icMeetingDate;
-      const parts = icMeetingDate.split('-');
-      const d = new Date(+parts[0], +parts[1] - 1, +parts[2]);
-      document.getElementById('ic-modal-title').textContent = `IC Meeting — ${d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+      document.getElementById('ic-edit-title').value = m.title || '';
+      document.getElementById('ic-modal-title').textContent = 'Edit IC Meeting';
       document.getElementById('ic-edit-time').value = m.time || '2:00 PM';
       document.getElementById('ic-edit-location').value = m.location || '';
       document.getElementById('ic-edit-notes').value = m.notes || '';
@@ -655,7 +669,9 @@
     }
 
     async function saveICMeeting() {
-      const dateStr = document.getElementById('ic-edit-date').value;
+      const originalDate = document.getElementById('ic-edit-original-date').value;
+      const newDate = document.getElementById('ic-edit-date').value;
+      const title = document.getElementById('ic-edit-title').value.trim();
       const time = document.getElementById('ic-edit-time').value.trim();
       const location = document.getElementById('ic-edit-location').value.trim();
       const notes = document.getElementById('ic-edit-notes').value.trim();
@@ -665,10 +681,28 @@
         link: row.querySelector('.ic-agenda-link').value.trim()
       })).filter(a => a.text);
 
-      const result = await Database.saveICMeeting(dateStr, { time, location, notes, agenda });
+      const data = { title, time, location, notes, agenda };
+      const dateChanged = newDate && newDate !== originalDate;
+
+      const result = await Database.saveICMeeting(newDate || originalDate, data);
       if (result.success) {
+        // If date changed, delete the old document
+        if (dateChanged) {
+          await Database.deleteICMeeting(originalDate);
+        }
         closeICModal();
-        icMeetingData = { ...icMeetingData, time, location, notes, agenda };
+
+        // Update local state to show the saved meeting
+        const savedDate = newDate || originalDate;
+        icMeetingDate = savedDate;
+        icMeetingData = { ...icMeetingData, ...data };
+
+        // Recalculate week offset to match the new date
+        const nextFri = getNextFriday();
+        const savedParts = savedDate.split('-');
+        const savedD = new Date(+savedParts[0], +savedParts[1] - 1, +savedParts[2]);
+        icWeekOffset = Math.round((savedD - nextFri) / (7 * 86400000));
+
         renderICMeetings();
         showToast('IC Meeting updated');
       } else {
