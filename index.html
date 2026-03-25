@@ -528,8 +528,37 @@
 
     async function loadICMeetings() {
       const fri = getFridayForOffset(icWeekOffset);
-      icMeetingDate = toLocalDateStr(fri);
-      icMeetingData = (await Database.getICMeeting(icMeetingDate)) || {};
+      const friStr = toLocalDateStr(fri);
+
+      // Check the Friday first
+      let data = await Database.getICMeeting(friStr);
+      if (data) {
+        icMeetingDate = friStr;
+        icMeetingData = data;
+        renderICMeetings();
+        return;
+      }
+
+      // If no meeting on Friday, check other days of that week (Mon–Sun)
+      const monday = new Date(fri);
+      monday.setDate(fri.getDate() - 4);
+      for (let i = 0; i < 7; i++) {
+        const day = new Date(monday);
+        day.setDate(monday.getDate() + i);
+        const dayStr = toLocalDateStr(day);
+        if (dayStr === friStr) continue;
+        data = await Database.getICMeeting(dayStr);
+        if (data) {
+          icMeetingDate = dayStr;
+          icMeetingData = data;
+          renderICMeetings();
+          return;
+        }
+      }
+
+      // No meeting found this week
+      icMeetingDate = friStr;
+      icMeetingData = {};
       renderICMeetings();
     }
 
@@ -671,44 +700,48 @@
     }
 
     async function saveICMeeting() {
-      const originalDate = document.getElementById('ic-edit-original-date').value;
-      const newDate = document.getElementById('ic-edit-date').value;
-      const title = document.getElementById('ic-edit-title').value.trim();
-      const time = document.getElementById('ic-edit-time').value.trim();
-      const location = document.getElementById('ic-edit-location').value.trim();
-      const notes = document.getElementById('ic-edit-notes').value.trim();
-      const rows = document.querySelectorAll('#ic-agenda-items .ic-agenda-row');
-      const agenda = Array.from(rows).map(row => ({
-        text: row.querySelector('.ic-agenda-text').value.trim(),
-        link: row.querySelector('.ic-agenda-link').value.trim()
-      })).filter(a => a.text);
+      try {
+        const originalDate = document.getElementById('ic-edit-original-date').value;
+        const newDate = document.getElementById('ic-edit-date').value;
+        if (!newDate) { showToast('Please select a date', true); return; }
 
-      const data = { title, time, location, notes, agenda };
-      const dateChanged = newDate && newDate !== originalDate;
+        const title = document.getElementById('ic-edit-title').value.trim();
+        const time = document.getElementById('ic-edit-time').value.trim();
+        const location = document.getElementById('ic-edit-location').value.trim();
+        const notes = document.getElementById('ic-edit-notes').value.trim();
+        const rows = document.querySelectorAll('#ic-agenda-items .ic-agenda-row');
+        const agenda = Array.from(rows).map(row => ({
+          text: row.querySelector('.ic-agenda-text').value.trim(),
+          link: row.querySelector('.ic-agenda-link').value.trim()
+        })).filter(a => a.text);
 
-      const result = await Database.saveICMeeting(newDate || originalDate, data);
-      if (result.success) {
+        const data = { title, time, location, notes, agenda };
+        const savedDate = newDate;
+        const dateChanged = originalDate && savedDate !== originalDate;
+
+        const result = await Database.saveICMeeting(savedDate, data);
+        if (!result.success) { showToast('Error saving meeting', true); return; }
+
         // If date changed, delete the old document
         if (dateChanged) {
-          await Database.deleteICMeeting(originalDate);
+          await Database.deleteICMeeting(originalDate).catch(() => {});
         }
+
         closeICModal();
-
-        // Update local state to show the saved meeting
-        const savedDate = newDate || originalDate;
         icMeetingDate = savedDate;
-        icMeetingData = { ...icMeetingData, ...data };
+        icMeetingData = { ...data, id: savedDate, date: savedDate };
 
-        // Recalculate week offset to match the new date
+        // Recalculate week offset so navigation stays on this week
         const nextFri = getNextFriday();
-        const savedParts = savedDate.split('-');
-        const savedD = new Date(+savedParts[0], +savedParts[1] - 1, +savedParts[2]);
+        const p = savedDate.split('-');
+        const savedD = new Date(+p[0], +p[1] - 1, +p[2]);
         icWeekOffset = Math.round((savedD - nextFri) / (7 * 86400000));
 
         renderICMeetings();
         showToast('IC Meeting updated');
-      } else {
-        showToast('Error saving meeting', true);
+      } catch (err) {
+        console.error('Save IC meeting error:', err);
+        showToast('Error: ' + err.message, true);
       }
     }
 
