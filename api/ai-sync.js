@@ -18,7 +18,9 @@ async function listCompanyFolders(drive, folderId) {
   const response = await drive.files.list({
     q: `'${folderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
     fields: 'files(id, name)',
-    pageSize: 100
+    pageSize: 100,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true
   });
   return response.data.files || [];
 }
@@ -28,7 +30,9 @@ async function listFilesInFolder(drive, folderId) {
   const response = await drive.files.list({
     q: `'${folderId}' in parents and trashed=false`,
     fields: 'files(id, name, mimeType, size, modifiedTime)',
-    pageSize: 50
+    pageSize: 50,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true
   });
   const files = response.data.files || [];
   
@@ -53,7 +57,9 @@ async function listFilesInFolder(drive, folderId) {
         q: `'${perfUpdateFolder.id}' in parents and trashed=false and mimeType!='application/vnd.google-apps.folder'`,
         fields: 'files(id, name, mimeType, size, modifiedTime)',
         orderBy: 'modifiedTime desc',
-        pageSize: 20
+        pageSize: 20,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true
       });
       if (subFiles.data.files) {
         subFiles.data.files.forEach(f => { f.source = 'performance_update'; });
@@ -70,7 +76,9 @@ async function listFilesInFolder(drive, folderId) {
       const subFiles = await drive.files.list({
         q: `'${sub.id}' in parents and trashed=false and mimeType!='application/vnd.google-apps.folder'`,
         fields: 'files(id, name, mimeType, size, modifiedTime)',
-        pageSize: 20
+        pageSize: 20,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true
       });
       if (subFiles.data.files) {
         subFiles.data.files.forEach(f => { f.source = `subfolder:${sub.name}`; });
