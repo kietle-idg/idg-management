@@ -20,7 +20,8 @@ async function listCompanyFolders(drive, folderId) {
     fields: 'files(id, name)',
     pageSize: 100,
     supportsAllDrives: true,
-    includeItemsFromAllDrives: true
+    includeItemsFromAllDrives: true,
+    corpora: 'allDrives'
   });
   return response.data.files || [];
 }
@@ -32,7 +33,8 @@ async function listFilesInFolder(drive, folderId) {
     fields: 'files(id, name, mimeType, size, modifiedTime)',
     pageSize: 50,
     supportsAllDrives: true,
-    includeItemsFromAllDrives: true
+    includeItemsFromAllDrives: true,
+    corpora: 'allDrives'
   });
   const files = response.data.files || [];
   
@@ -59,7 +61,8 @@ async function listFilesInFolder(drive, folderId) {
         orderBy: 'modifiedTime desc',
         pageSize: 20,
         supportsAllDrives: true,
-        includeItemsFromAllDrives: true
+        includeItemsFromAllDrives: true,
+        corpora: 'allDrives'
       });
       if (subFiles.data.files) {
         subFiles.data.files.forEach(f => { f.source = 'performance_update'; });
@@ -78,7 +81,8 @@ async function listFilesInFolder(drive, folderId) {
         fields: 'files(id, name, mimeType, size, modifiedTime)',
         pageSize: 20,
         supportsAllDrives: true,
-        includeItemsFromAllDrives: true
+        includeItemsFromAllDrives: true,
+        corpora: 'allDrives'
       });
       if (subFiles.data.files) {
         subFiles.data.files.forEach(f => { f.source = `subfolder:${sub.name}`; });
