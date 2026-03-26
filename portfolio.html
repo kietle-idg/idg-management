@@ -1168,12 +1168,12 @@
     // ========================
     // WEB RESEARCH HELPER
     // ========================
-    async function runWebResearch(companyName, website) {
+    async function runWebResearch(companyName, website, sector) {
       try {
         const resp = await fetch('/api/web-research', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ companyName, website: website || undefined })
+          body: JSON.stringify({ companyName, website: website || undefined, sector: sector || undefined })
         });
         const data = await resp.json();
         if (data.success && data.data) return data.data;
@@ -1255,7 +1255,7 @@
 
               // Web research: search for latest public updates
               btnText.textContent = `🌐 ${processed}/${totalFolders}: ${cleanName}`;
-              const webData = await runWebResearch(cleanName, existing.website);
+              const webData = await runWebResearch(cleanName, existing.website, existing.sector);
               if (webData) {
                 if (webData.webUpdates?.length) updateData.webUpdates = webData.webUpdates;
                 if (webData.sentiment) updateData.webSentiment = webData.sentiment;
@@ -1285,7 +1285,7 @@
 
               // Web research for new company too
               btnText.textContent = `🌐 ${processed}/${totalFolders}: ${cleanName}`;
-              const webData = await runWebResearch(cleanName);
+              const webData = await runWebResearch(cleanName, null, aiData.sector);
               if (webData) {
                 if (webData.webUpdates?.length) newCompanyData.webUpdates = webData.webUpdates;
                 if (webData.sentiment) newCompanyData.webSentiment = webData.sentiment;

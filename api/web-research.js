@@ -12,11 +12,11 @@ module.exports = async function handler(req, res) {
   if (!TAVILY_API_KEY) return res.status(500).json({ error: 'TAVILY_API_KEY not configured' });
   if (!OPENAI_API_KEY) return res.status(500).json({ error: 'OPENAI_API_KEY not configured' });
 
-  const { companyName, website, keywords } = req.body || {};
+  const { companyName, website, keywords, sector } = req.body || {};
   if (!companyName) return res.status(400).json({ error: 'companyName required' });
 
   try {
-    const searchResults = await runSearches(TAVILY_API_KEY, companyName, website, keywords);
+    const searchResults = await runSearches(TAVILY_API_KEY, companyName, website, keywords, sector);
     const structured = await analyzeWithAI(OPENAI_API_KEY, companyName, searchResults);
 
     return res.status(200).json({
@@ -90,17 +90,34 @@ async function tavilyExtract(apiKey, urls) {
   }));
 }
 
-async function runSearches(apiKey, companyName, website, keywords) {
+function buildSearchNames(companyName) {
+  const names = [companyName];
+  const parenMatch = companyName.match(/\(([^)]+)\)/);
+  if (parenMatch) {
+    names.push(parenMatch[1].replace(/^renamed as\s*/i, '').replace(/^merged as\s*/i, '').trim());
+    names.push(companyName.replace(/\s*\([^)]+\)/, '').trim());
+  }
+  const pivotMatch = companyName.match(/pivoted to\s+(\w+)/i);
+  if (pivotMatch) names.push(pivotMatch[1]);
+  return [...new Set(names.filter(n => n.length > 1))];
+}
+
+async function runSearches(apiKey, companyName, website, keywords, sector) {
+  const names = buildSearchNames(companyName);
   const extra = keywords ? ` ${keywords}` : '';
+  const sectorHint = (sector && /blockchain|crypto|defi|web3|fintech/i.test(sector)) ? ' crypto blockchain' : '';
+
+  const queryParts = names.map(n => `"${n}"`).join(' OR ');
+  const primaryQuery = `${queryParts}${extra}${sectorHint} latest news updates`;
 
   const searches = [
-    tavilySearch(apiKey, `"${companyName}"${extra} latest news funding updates`, {
+    tavilySearch(apiKey, primaryQuery, {
       max_results: 5,
       search_depth: 'basic',
       time_range: 'month'
     }),
 
-    tavilySearch(apiKey, `"${companyName}"${extra}`, {
+    tavilySearch(apiKey, `${queryParts}${sectorHint}`, {
       max_results: 3,
       search_depth: 'basic',
       include_domains: ['twitter.com', 'x.com'],
