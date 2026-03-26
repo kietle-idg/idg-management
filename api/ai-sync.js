@@ -255,11 +255,29 @@ module.exports = async function handler(req, res) {
       const folderId = FOLDER_ID;
       if (!folderId) return res.status(400).json({ error: 'GOOGLE_DRIVE_FOLDER_ID not set' });
       
+      // Diagnostic: try to access the folder itself
+      let folderInfo = null;
+      try {
+        const meta = await drive.files.get({
+          fileId: folderId,
+          fields: 'id,name,mimeType,driveId,teamDriveId',
+          supportsAllDrives: true
+        });
+        folderInfo = meta.data;
+      } catch (e) {
+        return res.status(200).json({
+          success: false,
+          error: `Cannot access folder ${folderId}: ${e.message}`,
+          hint: 'Share this folder with the service account email'
+        });
+      }
+
       const folders = await listCompanyFolders(drive, folderId);
       return res.status(200).json({
         success: true,
         folders: folders.map(f => ({ id: f.id, name: f.name })),
-        totalFolders: folders.length
+        totalFolders: folders.length,
+        parentFolder: folderInfo
       });
     }
 
