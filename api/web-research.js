@@ -62,7 +62,8 @@ async function tavilySearch(apiKey, query, options = {}) {
     title: r.title || '',
     url: r.url || '',
     content: (r.content || '').substring(0, 800),
-    score: r.score || 0
+    score: r.score || 0,
+    publishedDate: r.published_date || r.publishedDate || null
   }));
 }
 
@@ -91,15 +92,27 @@ async function tavilyExtract(apiKey, urls) {
 }
 
 function buildSearchNames(companyName) {
-  const names = [companyName];
+  const baseName = companyName.replace(/\s*\([^)]+\)/, '').trim();
   const parenMatch = companyName.match(/\(([^)]+)\)/);
+  const isRenamed = parenMatch && /renamed|merged|now\s/i.test(parenMatch[0]);
+  const isPivoted = /pivoted to/i.test(companyName);
+
+  let newName = null;
   if (parenMatch) {
-    names.push(parenMatch[1].replace(/^renamed as\s*/i, '').replace(/^merged as\s*/i, '').trim());
-    names.push(companyName.replace(/\s*\([^)]+\)/, '').trim());
+    newName = parenMatch[1].replace(/^renamed as\s*/i, '').replace(/^merged as\s*/i, '').replace(/^now\s*/i, '').trim();
   }
-  const pivotMatch = companyName.match(/pivoted to\s+(\w+)/i);
-  if (pivotMatch) names.push(pivotMatch[1]);
-  return [...new Set(names.filter(n => n.length > 1))];
+  if (isPivoted) {
+    const m = companyName.match(/pivoted to\s+(\w+)/i);
+    if (m) newName = m[1];
+  }
+
+  if ((isRenamed || isPivoted) && newName) {
+    return [newName, baseName].filter(n => n.length > 1);
+  }
+  if (newName) {
+    return [baseName, newName].filter(n => n.length > 1);
+  }
+  return [baseName].filter(n => n.length > 1);
 }
 
 async function runSearches(apiKey, companyName, website, keywords, sector) {
@@ -139,14 +152,16 @@ async function analyzeWithAI(apiKey, companyName, searchResults) {
   if (searchResults.news.length) {
     context += '=== RECENT NEWS & WEB RESULTS ===\n';
     for (const r of searchResults.news) {
-      context += `\n[${r.title}] (${r.url})\n${r.content}\n`;
+      const dateStr = r.publishedDate ? ` [Published: ${r.publishedDate}]` : '';
+      context += `\n[${r.title}]${dateStr} (${r.url})\n${r.content}\n`;
     }
   }
 
   if (searchResults.social.length) {
     context += '\n=== TWITTER / X MENTIONS ===\n';
     for (const r of searchResults.social) {
-      context += `\n[${r.title}] (${r.url})\n${r.content}\n`;
+      const dateStr = r.publishedDate ? ` [Published: ${r.publishedDate}]` : '';
+      context += `\n[${r.title}]${dateStr} (${r.url})\n${r.content}\n`;
     }
   }
 
@@ -174,7 +189,7 @@ Based on the web search results below, extract structured intelligence. Return a
   - "text": One clear sentence summarizing the update
   - "source": Source name (e.g. "TechCrunch", "Twitter", "Company Blog", domain name)
   - "url": The source URL
-  - "date": Estimated date if available (YYYY-MM-DD format), or null
+  - "date": The published date in YYYY-MM-DD format. Extract from [Published: ...] tags, article text, or URL patterns. ALWAYS try to provide a date — never return null if any date hint exists.
   - "category": One of "funding", "product", "partnership", "hiring", "media", "social", "other"
 
 - "sentiment": Overall sentiment — "positive", "neutral", "negative", or "mixed"

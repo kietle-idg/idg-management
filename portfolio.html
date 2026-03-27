@@ -636,8 +636,7 @@
             <div style="flex:1;min-width:0;">
               <div style="font-size:13px;color:var(--text-primary);line-height:1.5;">${w.text}</div>
               <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
-                ${w.url ? `<a href="${w.url}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;">${sourceLabel}</a>` : sourceLabel}
-                ${w.date ? ` · ${w.date}` : ''}
+                ${w.date ? `<span style="font-weight:600;">${w.date}</span> · ` : ''}${w.url ? `<a href="${w.url}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;">${sourceLabel}</a>` : sourceLabel}
               </div>
             </div>
           </div>`;
